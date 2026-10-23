@@ -1,0 +1,48 @@
+# ---- 依赖 ----
+node_modules
+.pnp
+.pnp.js
+
+# ---- 构建产物 ----
+.next
+out
+build
+dist
+.dev-cache
+.dev-run*
+.build-*
+nextbuild*
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- 开发过程素材（截图 / 模型中间文件，约 211MB，不入库）----
+outputs/
+.zipcheck/
+
+# ---- 环境变量 ----
+.env
+.env*.local
+!.env.example
+
+# ---- 部署平台 ----
+.vercel
+.netlify
+
+# ---- 日志 ----
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# ---- 系统与编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# ---- 证书与密钥 ----
+*.pem
+*.key

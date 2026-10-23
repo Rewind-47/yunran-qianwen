@@ -1,0 +1,30 @@
+const { chromium } = require("playwright-core");
+const fs = require("fs");
+const exe = ["C://Program Files (x86)//Microsoft//Edge//Application//msedge.exe","C://Program Files//Microsoft//Edge//Application//msedge.exe"].find(p=>fs.existsSync(p));
+(async () => {
+  const browser = await chromium.launch({ executablePath: exe, args: ["--use-gl=swiftshader","--disable-gpu-sandbox"] });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 950 }, deviceScaleFactor: 2 });
+  const errors = [];
+  page.on("console", m => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
+  page.on("pageerror", e => errors.push("pageerror: " + e.message));
+  await page.goto("http://localhost:3000/studio/personal/tie", { waitUntil: "networkidle", timeout: 240000 });
+  await page.waitForTimeout(2500);
+  await page.getByRole("button", { name: /上装/ }).first().click();
+  await page.waitForTimeout(1200);
+  const styleBtns = page.locator('button[title*=" · "]');
+  await styleBtns.first().click();
+  console.log('picked', await styleBtns.first().getAttribute('title'));
+  await page.waitForTimeout(9000);
+  const cv = page.locator("canvas").last();
+  const b = await cv.boundingBox();
+  const cx = b.x + b.width * 0.5, cy = b.y + b.height * 0.5;
+  await page.mouse.move(cx - 80, cy - 60);
+  await page.mouse.down();
+  for (let i = 1; i <= 24; i++) { await page.mouse.move(cx - 80 + i * 6, cy - 60 + i * 4); await page.waitForTimeout(12); }
+  await page.mouse.up();
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: "outputs/tee-paint-check.png" });
+  console.log("chip", await page.locator("text=/已涂|未落笔/").first().innerText().catch(() => "(none)"));
+  console.log("errors:", JSON.stringify(errors.slice(0, 6)));
+  await browser.close();
+})();

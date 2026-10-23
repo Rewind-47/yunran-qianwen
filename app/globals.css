@@ -1,0 +1,397 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #fbf8f1;
+  --ink: #101f2f;
+  --glass: rgba(251, 248, 241, 0.62);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * 页面底色：三层靛蓝/米白径向渐变叠坯布织纹，取代原来的纯色。
+   * 渐变用 fixed 固定，滚动时底色不动，内容在其上"走过"，层次更明显。
+   */
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    background-image:
+      radial-gradient(
+        1100px 620px at 6% -12%,
+        rgba(201, 219, 233, 0.62),
+        transparent 62%
+      ),
+      radial-gradient(
+        880px 520px at 102% 2%,
+        rgba(227, 216, 194, 0.55),
+        transparent 58%
+      ),
+      radial-gradient(
+        1200px 820px at 46% 112%,
+        rgba(159, 190, 218, 0.3),
+        transparent 64%
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(16, 31, 47, 0.018) 0px,
+        rgba(16, 31, 47, 0.018) 1px,
+        transparent 1px,
+        transparent 4px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        rgba(16, 31, 47, 0.014) 0px,
+        rgba(16, 31, 47, 0.014) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+    background-attachment: fixed;
+  }
+
+  /* 极低透明度颗粒纹理：压住渐变的"塑料感"，接近纸张/坯布的触感 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+  }
+
+  ::selection {
+    background: #c9dbe9;
+    color: #101f2f;
+  }
+
+  /*
+   * 字体分工（详见 app/fonts.css）：
+   * h1 = 毛笔楷书，只承担品牌题字与首屏主标题；h2/h3 = 宋体，
+   * 靠字重（600 / 500）和字号拉层次，而不是靠换字体。
+   * 正文一律无衬线，长文案的阅读效率优先。
+   */
+  h1 {
+    font-family: theme("fontFamily.brush");
+    font-weight: 400;
+    letter-spacing: 0.04em;
+  }
+
+  h2 {
+    font-family: theme("fontFamily.song");
+    font-weight: 600;
+    letter-spacing: -0.005em;
+  }
+
+  h3 {
+    font-family: theme("fontFamily.song");
+    font-weight: 500;
+    letter-spacing: 0.005em;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d6cbb5;
+    border-radius: 999px;
+    border: 2px solid var(--paper);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* 细边框卡片：全站统一使用 */
+  .panel {
+    @apply rounded-card border border-dye-900/10 bg-cloth-50/70 backdrop-blur-[2px];
+  }
+
+  .panel-strong {
+    @apply rounded-card border border-dye-900/15 bg-white;
+  }
+
+  /* 毛玻璃：导航栏与浮层共用 */
+  .glass {
+    background-color: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(165%);
+    backdrop-filter: blur(18px) saturate(165%);
+  }
+
+  /* 卡片悬浮：位移 + 阴影过渡，统一缓动，避免各页面手感不一致 */
+  .card-lift {
+    transition:
+      transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+      border-color 0.45s ease,
+      background-color 0.45s ease;
+    will-change: transform;
+  }
+  .card-lift:hover {
+    transform: translateY(-4px);
+    border-color: rgba(30, 63, 92, 0.22);
+    box-shadow:
+      0 1px 2px rgba(16, 31, 47, 0.04),
+      0 20px 42px -24px rgba(16, 31, 47, 0.3);
+  }
+
+  /* 图片：轻微圆角 + 悬浮放大（放大交给外层 group:hover 触发） */
+  .media-frame {
+    @apply relative overflow-hidden rounded-[10px];
+  }
+  .media-zoom {
+    @apply h-full w-full object-cover;
+    transition: transform 0.9s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform;
+  }
+  .group:hover .media-zoom {
+    transform: scale(1.045);
+  }
+
+  .hairline {
+    @apply h-px w-full bg-dye-900/10;
+  }
+
+  /*
+   * ---------- 扎染质感按钮 ----------
+   * 不做纯色块：靛蓝底子上叠三层「染液晕散」的径向渐变 + 坯布经纬细线，
+   * 边缘靠内阴影做出布料的薄厚感。hover 时晕染层缓慢错位，
+   * 像染液在布上继续渗开，而不是简单的变亮。
+   */
+  .btn-dye {
+    position: relative;
+    isolation: isolate;
+    background-color: #1b3d59;
+    background-image:
+      radial-gradient(60% 130% at 14% 8%, rgba(150, 193, 222, 0.55), transparent 62%),
+      radial-gradient(72% 140% at 92% 96%, rgba(8, 24, 38, 0.62), transparent 64%),
+      radial-gradient(30% 60% at 30% 62%, rgba(120, 172, 208, 0.32), transparent 72%),
+      radial-gradient(38% 90% at 64% 14%, rgba(214, 233, 246, 0.2), transparent 70%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.065) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.085) 0 1px, transparent 1px 3px),
+      linear-gradient(132deg, #14324a 0%, #2a5578 44%, #1a3d57 70%, #10283b 100%);
+    background-size:
+      170% 170%,
+      170% 170%,
+      170% 170%,
+      130% 130%,
+      auto,
+      auto,
+      100% 100%;
+    background-position:
+      0% 0%,
+      100% 100%,
+      40% 60%,
+      50% 50%,
+      0 0,
+      0 0,
+      0 0;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+      0 12px 26px -16px rgba(11, 33, 50, 0.8);
+    transition:
+      background-position 900ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 0.4s ease;
+  }
+  .btn-dye:hover {
+    background-position:
+      26% 20%,
+      74% 80%,
+      70% 30%,
+      50% 50%,
+      0 0,
+      0 0,
+      0 0;
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 18px 32px -16px rgba(11, 33, 50, 0.85);
+  }
+
+  /* 坯布白：米白底 + 经纬纹，配靛蓝字，用于深色大图上的主按钮 */
+  .btn-cloth {
+    background-color: #f6f1e6;
+    background-image:
+      radial-gradient(70% 120% at 12% 10%, rgba(255, 255, 255, 0.95), transparent 60%),
+      radial-gradient(60% 120% at 88% 96%, rgba(198, 210, 220, 0.55), transparent 64%),
+      repeating-linear-gradient(90deg, rgba(30, 63, 92, 0.07) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(0deg, rgba(30, 63, 92, 0.055) 0 1px, transparent 1px 3px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(30, 63, 92, 0.14),
+      0 14px 30px -18px rgba(8, 24, 38, 0.7);
+    transition:
+      background-position 900ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 0.4s ease;
+  }
+  .btn-cloth:hover {
+    transform: translateY(-1px);
+    background-position:
+      24% 18%,
+      76% 82%,
+      0 0,
+      0 0;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -1px 0 rgba(30, 63, 92, 0.18),
+      0 20px 36px -18px rgba(8, 24, 38, 0.8);
+  }
+
+  /* 大图压暗层：左侧深、右侧浅，保证白字可读又不把照片闷死 */
+  .hero-scrim {
+    background:
+      linear-gradient(
+        100deg,
+        rgba(10, 26, 40, 0.9) 0%,
+        rgba(10, 26, 40, 0.72) 34%,
+        rgba(10, 26, 40, 0.34) 62%,
+        rgba(10, 26, 40, 0.18) 100%
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(10, 26, 40, 0.55) 0%,
+        transparent 26%,
+        transparent 62%,
+        rgba(10, 26, 40, 0.6) 100%
+      );
+  }
+
+  /* 染液晕散的边角装饰，用于深色版块 */
+  .dye-blot {
+    background:
+      radial-gradient(60% 80% at 12% 10%, rgba(120, 170, 205, 0.35), transparent 66%),
+      radial-gradient(50% 70% at 88% 92%, rgba(90, 140, 175, 0.22), transparent 68%);
+  }
+
+  /*
+   * 首屏纹样边框：鱼子缬的圆点阵。
+   * 两层大小不同的白点错落排布，像扎结留白在布边滚了一圈。
+   */
+  .ich-frame-x {
+    background-image:
+      radial-gradient(circle, rgba(251, 248, 241, 0.4) 1.6px, transparent 2.2px),
+      radial-gradient(circle, rgba(251, 248, 241, 0.22) 1.1px, transparent 1.6px);
+    background-size: 26px 18px, 26px 18px;
+    background-position: 0 50%, 13px calc(50% + 5px);
+    background-repeat: repeat-x;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent);
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent);
+  }
+
+  .ich-frame-y {
+    background-image:
+      radial-gradient(circle, rgba(251, 248, 241, 0.4) 1.6px, transparent 2.2px),
+      radial-gradient(circle, rgba(251, 248, 241, 0.22) 1.1px, transparent 1.6px);
+    background-size: 18px 26px, 18px 26px;
+    background-position: 50% 0, calc(50% + 5px) 13px;
+    background-repeat: repeat-y;
+    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.9), transparent);
+    mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.9), transparent);
+  }
+
+  /* 展签式英文小标：拉丁衬线 + 大字距 + 小型大写，跟中文宋体是同一路数 */
+  .eyebrow {
+    font-family: theme("fontFamily.latin");
+    font-weight: 500;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-variant-caps: all-small-caps;
+  }
+
+  /* 引句：宋体细字，字号压过正文一档，用来接住大标题 */
+  .lede {
+    font-family: theme("fontFamily.song");
+    font-weight: 300;
+    letter-spacing: 0.015em;
+    line-height: 1.9;
+  }
+
+  /* 数字：拉丁衬线的等高数字，统计、日期、编号都用它 */
+  .figure {
+    font-family: theme("fontFamily.latin");
+    font-weight: 300;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  /* 题字：毛笔楷书，只给品牌级文字用 */
+  .title-brush {
+    font-family: theme("fontFamily.brush");
+    font-weight: 400;
+    letter-spacing: 0.05em;
+  }
+
+  /* 竖排小字：题跋语感，用在首屏与大图角落 */
+  .vertical-cn {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 0.28em;
+  }
+
+  /* 靛蓝染标：用于小标题前的短竖线 */
+  .dye-mark::before {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 0.9em;
+    margin-right: 0.55em;
+    vertical-align: -0.08em;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #2a5578, #6698bc);
+  }
+}
+
+/* 首屏大图的极缓推近：14 秒只放大 6%，用来制造「呼吸感」而不是明显动效 */
+@keyframes hero-drift {
+  from {
+    transform: scale(1.004);
+  }
+  to {
+    transform: scale(1.065);
+  }
+}
+.hero-drift {
+  animation: hero-drift 16s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hero-rise {
+  animation: hero-rise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .card-lift:hover,
+  .group:hover .media-zoom {
+    transform: none;
+  }
+  .hero-drift {
+    animation: none;
+  }
+}

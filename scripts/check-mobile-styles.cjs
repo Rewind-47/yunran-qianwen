@@ -1,0 +1,21 @@
+const { chromium } = require("playwright-core");
+const fs = require("fs");
+const exe = ["C://Program Files (x86)//Microsoft//Edge//Application//msedge.exe","C://Program Files//Microsoft//Edge//Application//msedge.exe"].find(p=>fs.existsSync(p));
+(async () => {
+  const browser = await chromium.launch({ executablePath: exe, args: ["--use-gl=swiftshader","--disable-gpu-sandbox"] });
+  const page = await browser.newPage({ viewport: { width: 390, height: 900 }, deviceScaleFactor: 2 });
+  const errors = [];
+  page.on("console", m => { if (m.type() === "error") errors.push(m.text().slice(0, 160)); });
+  page.on("pageerror", e => errors.push("pageerror: " + e.message));
+  await page.goto("http://localhost:3000/studio/personal/tie", { waitUntil: "networkidle", timeout: 240000 });
+  await page.waitForTimeout(8000);
+  const section = page.locator("text=二、选款式").first();
+  await section.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: "outputs/mobile-styles-near.png" });
+  await page.evaluate(() => window.scrollBy(0, 420));
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: "outputs/mobile-styles-grid.png" });
+  console.log("errors:", JSON.stringify(errors.slice(0, 6)));
+  await browser.close();
+})();
