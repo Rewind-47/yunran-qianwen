@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
  * 拖拽旋转、换载体、换机位都能用，证明「写实 3D」不是宣传语。
  * 用 IntersectionObserver 卡住——滚到附近才加载 three.js 与模型，
  * 首屏不会被 3D 拖慢。
+ *
+ * 载体可以由外部接管（受控模式）：载体屏左侧的索引条点一下，
+ * 右边的展品就换成那一件，两栏因此是一条因果，而不是两段并排的图文。
  */
 
 const GarmentViewer = dynamic(
@@ -27,7 +30,7 @@ const GarmentViewer = dynamic(
   },
 );
 
-const picks: { id: CarrierId; label: string }[] = [
+const fallbackPicks: { id: CarrierId; label: string }[] = [
   { id: "bucketHat", label: "渔夫帽" },
   { id: "dress", label: "连衣裙" },
   { id: "tote", label: "托特包" },
@@ -41,10 +44,37 @@ const technique = {
   palette: ["#FFFFFF", baseTechnique.palette[1], baseTechnique.palette[2]],
 };
 
-export function Showcase3D() {
+/**
+ * 取景余量。首页展台比工坊预览更宽更矮，统一退 12% 才不顶到画框；
+ * 靠枕、方巾、披巾这类铺满画幅的平摊物件再退一些，否则看不出是「一件东西」。
+ */
+const FRAME_ZOOM: Partial<Record<CarrierId, number>> = {
+  cushion: 1.3,
+  scarf: 1.28,
+  shawl: 1.28,
+  apron: 1.18,
+};
+
+export function Showcase3D({
+  carrier: controlled,
+  onCarrierChange,
+  showPicker = true,
+  picks = fallbackPicks,
+  heightClass = "h-[380px] w-full sm:h-[440px] lg:h-[500px]",
+  plateClassName,
+}: {
+  /** 受控载体；不传则用内部状态 */
+  carrier?: CarrierId;
+  onCarrierChange?: (id: CarrierId) => void;
+  showPicker?: boolean;
+  picks?: { id: CarrierId; label: string }[];
+  heightClass?: string;
+  plateClassName?: string;
+}) {
   const holder = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  const [carrier, setCarrier] = useState<CarrierId>("bucketHat");
+  const [inner, setInner] = useState<CarrierId>("bucketHat");
+  const carrier = controlled ?? inner;
 
   useEffect(() => {
     const el = holder.current;
@@ -69,10 +99,20 @@ export function Showcase3D() {
   const params = Object.fromEntries(technique.params.map((p) => [p.key, p.default]));
   const spec = carrierMap[carrier] ?? carrierMap.bucketHat;
 
+  const select = (id: CarrierId) => {
+    setInner(id);
+    onCarrierChange?.(id);
+  };
+
   return (
     <div ref={holder} className="relative">
-      <div className="relative overflow-hidden rounded-[18px] border border-dye-900/[0.12] bg-[#efe9db] shadow-float">
-        <div className="h-[400px] w-full sm:h-[470px] lg:h-[540px]">
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-[18px] border border-dye-900/[0.12] bg-[#efe9db] shadow-float",
+          plateClassName,
+        )}
+      >
+        <div className={heightClass}>
           {visible ? (
             <GarmentViewer
               technique={technique}
@@ -81,6 +121,7 @@ export function Showcase3D() {
               carrier={carrier}
               view="quarter"
               autoRotate
+              zoom={FRAME_ZOOM[carrier] ?? 1.12}
               className="h-full w-full"
               fallback={
                 // WebGL 不可用时退到静态图，不留空白
@@ -109,27 +150,29 @@ export function Showcase3D() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {picks.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setCarrier(p.id)}
-            aria-pressed={carrier === p.id}
-            className={cn(
-              "rounded-full border px-4 py-1.5 text-[12.5px] transition-all duration-300",
-              carrier === p.id
-                ? "border-dye-800/50 bg-dye-800 text-cloth-50 shadow-[0_8px_18px_-12px_rgba(16,31,47,0.8)]"
-                : "border-dye-900/15 bg-white/45 text-dye-800/70 hover:border-dye-700/40 hover:bg-white/85",
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
-        <span className="ml-auto hidden text-[11px] tracking-wide text-dye-800/40 sm:inline">
-          {spec.spec}
-        </span>
-      </div>
+      {showPicker && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {picks.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => select(p.id)}
+              aria-pressed={carrier === p.id}
+              className={cn(
+                "rounded-full border px-4 py-1.5 text-[12.5px] transition-all duration-300",
+                carrier === p.id
+                  ? "border-dye-800/50 bg-dye-800 text-cloth-50 shadow-[0_8px_18px_-12px_rgba(16,31,47,0.8)]"
+                  : "border-dye-900/15 bg-white/45 text-dye-800/70 hover:border-dye-700/40 hover:bg-white/85",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+          <span className="ml-auto hidden text-[11px] tracking-wide text-dye-800/40 sm:inline">
+            {spec.spec}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

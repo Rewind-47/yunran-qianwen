@@ -1,10 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
+import { CarrierSection } from "@/components/carrier-section";
 import { CraftIndex } from "@/components/craft-index";
 import { CraftShowcase } from "@/components/craft-showcase";
 import { HeroBanner } from "@/components/hero-banner";
 import { NewsCenter } from "@/components/news-center";
-import { SectionHeading } from "@/components/section-heading";
+import { PhotoArchive } from "@/components/photo-archive";
 import { cn } from "@/lib/utils";
 
 const stats = [
@@ -14,24 +14,18 @@ const stats = [
   ["29", "段权威语料"],
 ];
 
-const archive = [
-  {
-    src: "/images/village.webp",
-    alt: "青瓦白墙的白族村落",
-    cap: "周城 · 白族民居与晾布",
-  },
-  {
-    src: "/images/craft-vat.webp",
-    alt: "靛蓝色染缸",
-    cap: "染坊 · 板蓝根靛缸",
-  },
-  {
-    src: "/images/products.webp",
-    alt: "扎染文创产品",
-    cap: "文创 · 从布面到日常",
-  },
-];
-
+/**
+ * 门户首页。
+ *
+ * 深浅节奏（自上而下）：
+ *   首屏大图（暗）→ 通知条（浅）→ 扎染名录（深靛蓝）→ 新闻资讯（浅蓝纸）
+ *   → 02 工艺（坯布米白）→ 03 载体（深靛蓝染缸）→ 数字一览（深靛蓝）
+ *   → 04 影像志（坯布米白）→ 结尾引导（深靛蓝）
+ *
+ * 02 / 03 / 04 是一组：先说工艺怎么来，再说纹样落在什么上面，
+ * 最后回到院子里的照片。三屏各有一件自己的版面记号——
+ * 染程色阶、竖排题签、相纸题签条——底子仍是同一块布。
+ */
 export default function PortalPage() {
   return (
     <div>
@@ -61,15 +55,19 @@ export default function PortalPage() {
       {/* 资讯中心：版式参考云南省非遗保护网（ynich.cn）的新闻资讯屏 */}
       <NewsCenter />
 
-      {/* 工艺 · 载体 · 3D */}
+      {/* 02 工艺：染程四步 + 十七种工艺谱 */}
       <CraftShowcase />
 
-      {/* 数字一览：整幅深靛蓝通栏，给长页面一个节奏断点 */}
+      {/* 03 载体：四类十五种按实物建模，点索引换展台 */}
+      <CarrierSection />
+
+      {/* 数字一览：整幅深靛蓝通栏，给长页面一个节奏断点。
+          上沿是一道车缝线——载体屏与这里本是两块深靛蓝，靠这道缝分开 */}
       <section className="relative overflow-hidden bg-dye-950 py-16 md:py-24">
         <div aria-hidden className="pointer-events-none absolute inset-0 dye-blot opacity-80" />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cloth-100/25 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] [background-image:repeating-linear-gradient(90deg,rgba(251,248,241,0.24)_0_10px,transparent_10px_24px)]"
         />
         <div className="relative mx-auto max-w-6xl px-5">
           <div className="flex items-baseline justify-between">
@@ -99,40 +97,8 @@ export default function PortalPage() {
         </div>
       </section>
 
-      {/* 影像志 */}
-      <section className="mx-auto max-w-6xl px-5 py-20 md:py-24">
-        <SectionHeading
-          index="03"
-          eyebrow="Photo Archive"
-          title="影像志"
-          description="从村落到染坊，再到日常的物件——蓝白如何长进生活里。"
-        />
-        <div className="mt-12 grid gap-6 md:grid-cols-3 md:gap-7">
-          {archive.map((g, i) => (
-            <figure key={g.src} className="group m-0">
-              <div className="media-frame aspect-[4/5] border border-dye-900/10 bg-white/50 p-2">
-                <div className="relative h-full w-full overflow-hidden rounded-[8px]">
-                  <Image
-                    src={g.src}
-                    alt={g.alt}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="media-zoom"
-                  />
-                </div>
-              </div>
-              <figcaption className="mt-4 flex items-baseline gap-2.5">
-                <span className="figure text-[11px] text-dye-800/35">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="font-song text-[12.5px] tracking-wide text-dye-800/65">
-                  {g.cap}
-                </span>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      </section>
+      {/* 04 影像志：五帧相纸卡 */}
+      <PhotoArchive />
 
       {/* 结尾引导：深色通栏 + 坯布白按钮 */}
       <section className="relative overflow-hidden bg-dye-950 py-20 md:py-28">

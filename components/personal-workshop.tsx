@@ -303,6 +303,12 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
     model: string | null;
     source: "model" | "local";
   } | null>(null);
+  const [generatedPattern, setGeneratedPattern] = useState<{
+    imageUrl: string;
+    model: string;
+  } | null>(null);
+  const [generatingPattern, setGeneratingPattern] = useState(false);
+  const [patternError, setPatternError] = useState<string | null>(null);
   const [engine, setEngine] = useState<{ mode: "llm" | "local"; label: string } | null>(null);
 
   // 本地库只在挂载后读，避免服务端渲染读到空
@@ -415,6 +421,39 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
 
   function choosePalette(id: string) {
     setPalette(id);
+  }
+
+  async function generatePattern() {
+    if (generatingPattern) return;
+    setGeneratingPattern(true);
+    setGeneratedPattern(null);
+    setPatternError(null);
+
+    try {
+      const response = await fetch("/api/pattern", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          techniqueId: base.id,
+          params: activeParams,
+          theme,
+          carrier: carrier.name,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        imageUrl?: string;
+        model?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.imageUrl || !result.model) {
+        throw new Error(result.error ?? "扎染纹样生成失败，请稍后重试");
+      }
+      setGeneratedPattern({ imageUrl: result.imageUrl, model: result.model });
+    } catch (error) {
+      setPatternError(error instanceof Error ? error.message : "扎染纹样生成失败");
+    } finally {
+      setGeneratingPattern(false);
+    }
   }
 
   function choosePattern(id: typeof patternId) {
@@ -1136,6 +1175,36 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
             placeholder="题材，如「大理山茶花」"
             className="mt-4 h-9 w-full rounded-lg border border-dye-900/12 bg-cloth-50 px-3 text-[12.5px] text-dye-900 placeholder:text-dye-800/35 focus:border-dye-600/45 focus:outline-none"
           />
+          {base.category === "tie" && (
+            <div className="mt-3">
+              <Button onClick={generatePattern} disabled={generatingPattern} size="sm">
+                {generatingPattern ? "正在生成纹样…" : "生成纹样"}
+              </Button>
+              {generatingPattern && (
+                <p role="status" className="mt-2 text-[11px] text-dye-800/50">
+                  万相正在根据当前工艺参数生成图片，请稍候。
+                </p>
+              )}
+              {patternError && (
+                <p role="alert" className="mt-2 text-[11px] leading-relaxed text-madder-600">
+                  {patternError}
+                </p>
+              )}
+              {generatedPattern && (
+                <div className="mt-3 overflow-hidden rounded-lg border border-dye-900/10 bg-cloth-50/70">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`}
+                    alt={`${technique.name}生成的扎染纹样`}
+                    className="max-h-80 w-full object-contain"
+                  />
+                  <p className="px-3 py-2 text-[10.5px] text-dye-800/55">
+                    通义万相生成 · {generatedPattern.model}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </section>
         {/* 七 / 六、AI 方案：规划、工具调用、自检与建议都留在同一栏，点完直接看结果 */}
         <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">

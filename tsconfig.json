@@ -37,7 +37,8 @@
     ".dev-run/types/**/*.ts",
     ".dev-run2/types/**/*.ts",
     ".dev-run3/types/**/*.ts",
-    ".dev-run4/types/**/*.ts"
+    ".dev-run4/types/**/*.ts",
+    ".dev-run5/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
