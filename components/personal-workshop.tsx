@@ -156,7 +156,13 @@ function Dot({
   );
 }
 
-export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
+export function PersonalWorkshop({
+  family,
+  initialStyleCategory,
+}: {
+  family?: TechniqueCategory;
+  initialStyleCategory?: StyleCategory;
+}) {
   const {
     techniqueId,
     styleId,
@@ -222,6 +228,7 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
   // 布面图层：模型本体永远是一件白坯布，只有这里被涂过的地方才有颜色。
   const [cloth, setCloth] = useState<ClothPaint | null>(null);
   const [paintStrokes, setPaintStrokes] = useState(0);
+  const [appliedPatternUrl, setAppliedPatternUrl] = useState<string | null>(null);
   const [paintOn, setPaintOn] = useState(true);
   const [brushTool, setBrushTool] = useState<PaintTool>("soft");
   const [brushSize, setBrushSize] = useState(0.12);
@@ -235,6 +242,7 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
     tipTimer.current = setTimeout(() => setTip(null), 2400);
   }, []);
 
+  const previousStyleId = useRef(activeStyle.id);
   // 画布只能客户端建
   useEffect(() => {
     const p = clothPaint();
@@ -310,6 +318,21 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
   const [generatingPattern, setGeneratingPattern] = useState(false);
   const [patternError, setPatternError] = useState<string | null>(null);
   const [engine, setEngine] = useState<{ mode: "llm" | "local"; label: string } | null>(null);
+
+  const handlePatternImageError = useCallback((message: string) => {
+    setAppliedPatternUrl(null);
+    setPatternError(message);
+  }, []);
+
+  useEffect(() => {
+    if (previousStyleId.current === activeStyle.id) return;
+    previousStyleId.current = activeStyle.id;
+    cloth?.reset();
+    setPaintStrokes(0);
+    setAppliedPatternUrl(null);
+    setGeneratedPattern(null);
+    setPatternError(null);
+  }, [activeStyle.id, cloth]);
 
   // 本地库只在挂载后读，避免服务端渲染读到空
   useEffect(() => {
@@ -400,6 +423,19 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
     }
   }
 
+  useEffect(() => {
+    if (!initialStyleCategory) return;
+
+    setCategory(initialStyleCategory);
+    const first =
+      styleDb.featured(initialStyleCategory)[0] ??
+      styleDb.query({ category: initialStyleCategory })[0];
+    if (first) {
+      setStyle(first.id);
+      setGroup(first.group ?? "长裙");
+    }
+  }, [initialStyleCategory, setStyle]);
+
   function chooseStyle(id: string) {
     setStyle(id);
     // 深链或「相关推荐」进来的款式，分组标签也要跟过去，别让选中的卡不在当前组里
@@ -454,6 +490,17 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
     } finally {
       setGeneratingPattern(false);
     }
+  }
+
+  function applyGeneratedPattern() {
+    if (!generatedPattern) return;
+
+    cloth?.reset();
+    setPaintStrokes(0);
+    setPatternError(null);
+    setAppliedPatternUrl(
+      `/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`,
+    );
   }
 
   function choosePattern(id: typeof patternId) {
@@ -1186,22 +1233,39 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
                 </p>
               )}
               {patternError && (
-                <p role="alert" className="mt-2 text-[11px] leading-relaxed text-madder-600">
+                <p role="alert" className="mt-2 text-[11px] leading-relaxed text-madder-500">
                   {patternError}
                 </p>
               )}
               {generatedPattern && (
-                <div className="mt-3 overflow-hidden rounded-lg border border-dye-900/10 bg-cloth-50/70">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`}
-                    alt={`${technique.name}生成的扎染纹样`}
-                    className="max-h-80 w-full object-contain"
-                  />
-                  <p className="px-3 py-2 text-[10.5px] text-dye-800/55">
-                    通义万相生成 · {generatedPattern.model}
-                  </p>
-                </div>
+                <>
+                  <div className="mt-3 overflow-hidden rounded-lg border border-dye-900/10 bg-cloth-50/70">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`}
+                      alt={`${technique.name}生成的扎染纹样`}
+                      className="max-h-80 w-full object-contain"
+                    />
+                    <p className="px-3 py-2 text-[10.5px] text-dye-800/55">
+                      通义万相生成 · {generatedPattern.model}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={applyGeneratedPattern}
+                    disabled={
+                      appliedPatternUrl ===
+                      `/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`
+                    }
+                    size="sm"
+                    className="mt-2"
+                  >
+                    {appliedPatternUrl ===
+                    `/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`
+                      ? "已应用到 3D 预览"
+                      : "应用到 3D 预览"}
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -1388,6 +1452,8 @@ export function PersonalWorkshop({ family }: { family?: TechniqueCategory }) {
                   style={activeStyle.shape}
                   view={view}
                   paint={paintBinding}
+                  patternImageUrl={appliedPatternUrl}
+                  onPatternImageError={handlePatternImageError}
                   fallback={
                     <div className="relative h-full w-full">
                       {isEmbroidery ? (

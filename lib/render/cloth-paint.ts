@@ -257,6 +257,19 @@ export class ClothPaint {
     if (this.undoStack.length > MAX_UNDO) this.undoStack.splice(0, this.undoStack.length - MAX_UNDO);
   }
 
+  /** 切换款式时清空所有衣片与撤销记录，避免旧款的笔迹污染新款。 */
+  reset() {
+    this.layers.forEach((l) => {
+      l.ctx.fillStyle = CLOTH;
+      l.ctx.fillRect(0, 0, SIZE, SIZE);
+      l.strokes = 0;
+      l.last = null;
+      l.texture.needsUpdate = true;
+    });
+    this.undoStack = [];
+    this.pendingSketch = null;
+  }
+
   /** 局部重绘带来的手绘稿：铺到每一片坯布上（含之后才创建的衣片），之后还能继续涂 */
   async applySketch(dataUrl: string) {
     const image = await loadImage(dataUrl);

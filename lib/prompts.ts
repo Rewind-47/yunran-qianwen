@@ -182,13 +182,12 @@ export function describeParams(
 
 /**
  * 生成文生图提示词。
- * 结构：主体 + 工艺动作 + 参数后果 + 材质与光线 + 负向约束
+ * 结构：平面纹样主体 + 工艺动作 + 参数后果 + 贴图输出约束
  */
 export function buildImagePrompt(
   technique: Technique,
   values: Record<string, number>,
   theme?: string,
-  carrier?: string,
 ): string {
   const effects = technique.params.map((p) => {
     const v = values[p.key] ?? p.default;
@@ -201,27 +200,27 @@ export function buildImagePrompt(
       : technique.category === "print"
         ? "防染印花工艺"
         : "扎染（绞缬）工艺";
-
-  const material =
-    technique.surface === "sheen"
-      ? "底料为真丝缎，丝线光泽随角度变化"
-      : technique.surface === "raised"
-        ? "丝线在布面形成可见的立体针脚与投影"
-        : technique.surface === "crisp"
-          ? "手织平纹棉布，布面挺括、纤维清晰"
-          : "手织棉布，布面柔软、有自然褶皱";
+  const isTieDye = technique.category === "tie";
 
   return [
-    `${carrier ? `${carrier}，` : ""}云南白族${kind}实物特写，主纹样为${technique.signature}（${technique.name}）`,
-    theme ? `题材：${theme}` : "",
+    isTieDye
+      ? `云南白族${kind}手工防染纹理，展现${technique.name}的自然染色过程`
+      : `云南白族${kind}平面纹样设计，主纹样为${technique.signature}（${technique.name}）`,
+    !isTieDye && theme ? `题材：${theme}` : "",
     `工艺：${technique.principle}`,
     `参数影响：${effects.join("；")}`,
-    `材质：${material}`,
     technique.category === "embroider"
-      ? "用色：靛蓝底料配金、朱、月白丝线，针脚方向一致"
-      : "用色：板蓝根靛蓝，深浅有层次，米白留白处保留坯布本色",
-    "光线：柔和侧光，突出布面起伏与工艺痕迹的边缘",
-    "风格：纪实摄影质感，非遗工艺记录，可见手工不完美",
+      ? "用色：靛蓝底色配金、朱、月白色纹样，颜色均匀平涂"
+      : "用色：板蓝根靛蓝与米白留白，色彩平面呈现",
+    "Seamless flat pattern texture, top-down view, purely 2D repeating graphic, no clothing silhouette, no background, endless fabric print design",
+    "No shadows, no highlights, no 3D effects",
+    isTieDye
+      ? "Traditional Chinese Bai tie-dye (Zha Ran), Shibori technique, organic dye bleeding, irregular resist folds"
+      : "",
+    isTieDye
+      ? "Asymmetrical, random scattered pattern, watercolor wash effect, uneven indigo dye absorption, ink bleed edges"
+      : "",
+    "只生成铺满画面的平面扎染花纹方块图，纹样连续重复、边缘可无缝拼接；不出现衣物、服装轮廓、实体布料、模特、道具、场景或任何背景，不使用透视、褶皱、纹理起伏、光影或摄影效果",
   ]
     .filter(Boolean)
     .join("。");

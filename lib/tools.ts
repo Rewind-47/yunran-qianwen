@@ -81,7 +81,7 @@ const getTechniqueDetail: ToolDefinition<{ techniqueId: string }> = {
 
 /** 负面提示词：把「像机印花 / 数码照片 / 现代印花」这类跑偏结果压下去 */
 export const IMAGE_NEGATIVE_PROMPT =
-  "机器印花, 数码印花, 徽标, 文字, 水印, 塑料质感, 过度饱和, 日式扎染, 日本传统服饰, 数码绘画";
+  "机器印花, 数码印花, 徽标, 文字, 水印, 塑料质感, 过度饱和, 日式扎染, 日本传统服饰, 数码绘画, 立体布料, 衣物, 织物褶皱, 透视, 阴影, 高光, 反光, 3D效果, 实物摄影, 场景背景, No perfect symmetry, no geometric shapes, no digital printing effect";
 
 const generateImage: ToolDefinition<{
   techniqueId: string;

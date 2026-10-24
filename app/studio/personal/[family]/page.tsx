@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PersonalWorkshop } from "@/components/personal-workshop";
+import { styleCategories } from "@/lib/data/styles";
 import { techniqueCategories } from "@/lib/data/techniques";
 import type { TechniqueCategory } from "@/lib/types";
 
@@ -16,11 +17,22 @@ export function generateMetadata({ params }: { params: { family: string } }) {
 
 export default function PersonalFamilyPage({
   params,
+  searchParams,
 }: {
   params: { family: string };
+  searchParams?: { styleCategory?: string };
 }) {
   const hit = techniqueCategories.find((c) => c.id === params.family);
   if (!hit) notFound();
 
-  return <PersonalWorkshop family={hit.id as TechniqueCategory} />;
+  const styleCategory = styleCategories.find(
+    (category) => category.id === searchParams?.styleCategory,
+  )?.id;
+
+  return (
+    <PersonalWorkshop
+      family={hit.id as TechniqueCategory}
+      initialStyleCategory={styleCategory}
+    />
+  );
 }

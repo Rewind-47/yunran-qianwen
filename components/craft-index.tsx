@@ -74,7 +74,10 @@ export function CraftIndex() {
             return (
               <Link
                 key={c.id}
-                href="/studio/personal"
+                href={{
+                  pathname: "/studio/personal/tie",
+                  query: { styleCategory: c.id },
+                }}
                 className="group relative block aspect-[3/4] w-full overflow-hidden rounded-[3px] ring-1 ring-inset ring-cloth-100/15 transition-all duration-500 ease-soft hover:ring-cloth-100/45 lg:aspect-auto lg:h-full lg:flex-1"
               >
                 <Image

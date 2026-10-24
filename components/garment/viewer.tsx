@@ -97,6 +97,9 @@ export interface GarmentViewerProps {
   zoom?: number;
   /** 布面涂鸦绑定；不给就是纯预览 */
   paint?: GarmentPaint | null;
+  /** 同源代理后的 AI 纹样图片；应用到所有衣料贴图 */
+  patternImageUrl?: string | null;
+  onPatternImageError?: (message: string) => void;
   className?: string;
   fallback?: ReactNode;
 }
@@ -112,6 +115,8 @@ export function GarmentViewer({
   showControls = true,
   zoom = 1,
   paint = null,
+  patternImageUrl = null,
+  onPatternImageError,
   className,
   fallback,
 }: GarmentViewerProps) {
@@ -276,6 +281,8 @@ export function GarmentViewer({
               api={api}
               onInteract={grab}
               paint={paint}
+              patternImageUrl={patternImageUrl}
+              onPatternImageError={onPatternImageError}
             />
           </Suspense>
 
@@ -392,6 +399,8 @@ function ModelStage({
   api,
   onInteract,
   paint,
+  patternImageUrl,
+  onPatternImageError,
 }: {
   technique: Technique;
   params: Record<string, number>;
@@ -405,6 +414,8 @@ function ModelStage({
   api: { current: ViewerApi | null };
   onInteract: () => void;
   paint?: GarmentPaint | null;
+  patternImageUrl?: string | null;
+  onPatternImageError?: (message: string) => void;
 }) {
   const spec = carrierMap[carrier] ?? carrierMap.scarf;
   // 刺绣不做满幅重复：一块布上只有一处主纹，贴图 1:1 铺一次。
@@ -428,6 +439,93 @@ function ModelStage({
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const ndc = useMemo(() => new THREE.Vector2(), []);
   const { camera, gl } = useThree();
+
+  useEffect(() => {
+    if (!patternImageUrl) return;
+
+    let cancelled = false;
+    let loadedTexture: THREE.Texture | null = null;
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      patternImageUrl,
+      (texture) => {
+        loadedTexture = texture;
+        if (cancelled) {
+          texture.dispose();
+          return;
+        }
+
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(2.5, 3.2);
+        texture.offset.set(0.1, -0.2);
+        texture.needsUpdate = true;
+        const root = group.current;
+        if (!root) {
+          onPatternImageError?.("3D 模型尚未准备完成，请稍后重试应用纹样。");
+          return;
+        }
+
+        let applied = 0;
+        root.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          const materials = Array.isArray(object.material)
+            ? object.material
+            : [object.material];
+
+          for (const material of materials) {
+            if (!material.userData.paintLayer || !material.map) continue;
+            const canvas = material.map.image as HTMLCanvasElement | undefined;
+            const context = canvas?.getContext("2d");
+            if (!canvas || !context) continue;
+
+            context.save();
+            context.globalCompositeOperation = "multiply";
+            const tileWidth = canvas.width / texture.repeat.x;
+            const tileHeight = canvas.height / texture.repeat.y;
+            const startX = texture.offset.x * canvas.width;
+            const startY = texture.offset.y * canvas.height;
+            for (
+              let y = startY - tileHeight;
+              y < canvas.height;
+              y += tileHeight
+            ) {
+              for (
+                let x = startX - tileWidth;
+                x < canvas.width;
+                x += tileWidth
+              ) {
+                context.drawImage(
+                  texture.image,
+                  x,
+                  y,
+                  tileWidth,
+                  tileHeight,
+                );
+              }
+            }
+            context.restore();
+            material.map.needsUpdate = true;
+            applied += 1;
+          }
+        });
+
+        if (applied === 0) {
+          onPatternImageError?.("没有找到可应用纹样的布料材质，请稍后重试。");
+        }
+      },
+      undefined,
+      () => {
+        if (!cancelled) onPatternImageError?.("纹样图片加载失败，请重新生成后重试。");
+      },
+    );
+
+    return () => {
+      cancelled = true;
+      loadedTexture?.dispose();
+    };
+  }, [patternImageUrl, onPatternImageError]);
 
   /** 屏幕坐标 → 命中衣片的（图层 id, UV） */
   const pick = (clientX: number, clientY: number) => {
