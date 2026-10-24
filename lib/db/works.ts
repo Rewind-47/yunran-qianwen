@@ -11,6 +11,23 @@
 
 const KEY = "yunran:works:v1";
 
+export interface SavedWorkState {
+  styleId: string;
+  techniqueId: string;
+  palette: string[];
+  params: Record<string, number>;
+  seed: string;
+  patternId?: string;
+  layout?: string;
+  motifScale?: number;
+  theme?: string;
+  textureDensity: number;
+  paintStrokes: number;
+  generatedPattern?: { imageUrl: string; model: string } | null;
+  appliedPatternUrl?: string | null;
+  paint?: string;
+}
+
 export interface SavedWork {
   id: string;
   /** 保存时间（毫秒时间戳） */
@@ -31,6 +48,8 @@ export interface SavedWork {
   motifScale?: number;
   /** 手工涂鸦的布面截图（JPEG dataUrl，384²，仅用于「我的」页复现） */
   paint?: string;
+  /** 继续调整所需的完整工坊状态 */
+  workState?: SavedWorkState;
 }
 
 const MAX_WORKS = 60;
@@ -44,6 +63,7 @@ function sanitize(value: unknown): SavedWork[] {
     if (typeof w.id !== "string" || typeof w.styleId !== "string" || typeof w.techniqueId !== "string") {
       continue;
     }
+    const workState = sanitizeWorkState(w.workState);
     out.push({
       id: w.id,
       createdAt: typeof w.createdAt === "number" ? w.createdAt : 0,
@@ -56,9 +76,56 @@ function sanitize(value: unknown): SavedWork[] {
       layout: typeof w.layout === "string" ? w.layout : undefined,
       motifScale: typeof w.motifScale === "number" ? w.motifScale : undefined,
       paint: typeof w.paint === "string" && w.paint.startsWith("data:image") ? w.paint : undefined,
+      workState,
     });
   }
   return out.slice(0, MAX_WORKS);
+}
+
+function sanitizeWorkState(value: unknown): SavedWorkState | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const state = value as Partial<SavedWorkState>;
+  if (
+    typeof state.styleId !== "string" ||
+    typeof state.techniqueId !== "string" ||
+    !Array.isArray(state.palette) ||
+    !state.palette.every((color) => typeof color === "string") ||
+    !state.params ||
+    typeof state.params !== "object" ||
+    typeof state.seed !== "string" ||
+    typeof state.textureDensity !== "number" ||
+    typeof state.paintStrokes !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    styleId: state.styleId,
+    techniqueId: state.techniqueId,
+    palette: state.palette,
+    params: state.params,
+    seed: state.seed,
+    patternId: state.patternId,
+    layout: state.layout,
+    motifScale: state.motifScale,
+    theme: state.theme,
+    textureDensity: state.textureDensity,
+    paintStrokes: state.paintStrokes,
+    generatedPattern:
+      state.generatedPattern &&
+      typeof state.generatedPattern.imageUrl === "string" &&
+      typeof state.generatedPattern.model === "string"
+        ? state.generatedPattern
+        : null,
+    appliedPatternUrl:
+      typeof state.appliedPatternUrl === "string"
+        ? state.appliedPatternUrl
+        : null,
+    paint:
+      typeof state.paint === "string" && state.paint.startsWith("data:image")
+        ? state.paint
+        : undefined,
+  };
 }
 
 export function listWorks(): SavedWork[] {

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { PersonalWorkshop } from "@/components/personal-workshop";
 import { styleCategories } from "@/lib/data/styles";
@@ -30,9 +31,11 @@ export default function PersonalFamilyPage({
   )?.id;
 
   return (
-    <PersonalWorkshop
-      family={hit.id as TechniqueCategory}
-      initialStyleCategory={styleCategory}
-    />
+    <Suspense fallback={<div className="min-h-[60vh]" />}>
+      <PersonalWorkshop
+        family={hit.id as TechniqueCategory}
+        initialStyleCategory={styleCategory}
+      />
+    </Suspense>
   );
 }

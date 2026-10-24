@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PatternSwatch } from "@/components/pattern-swatch";
 import { GarmentShot } from "@/components/garment-shot";
@@ -34,7 +35,7 @@ import {
   type StyleCategory,
 } from "@/lib/data/styles";
 import { styleDb } from "@/lib/db/style-db";
-import { saveWork } from "@/lib/db/works";
+import { listWorks, saveWork, type SavedWorkState } from "@/lib/db/works";
 import {
   readLibrary,
   rememberColor,
@@ -165,6 +166,8 @@ export function PersonalWorkshop({
   family?: TechniqueCategory;
   initialStyleCategory?: StyleCategory;
 }) {
+  const searchParams = useSearchParams();
+  const workId = searchParams.get("workId");
   const isLoggedIn = useUserStore((state) => state.isLoggedIn);
   const openLoginModal = useUserStore((state) => state.openLoginModal);
   const userInfo = useUserStore((state) => state.userInfo);
@@ -322,6 +325,10 @@ export function PersonalWorkshop({
     imageUrl: string;
     model: string;
   } | null>(null);
+  const [restoreWorkState, setRestoreWorkState] =
+    useState<SavedWorkState | null>(null);
+  const requestedWorkId = useRef<string | null>(null);
+  const restoredWorkId = useRef<string | null>(null);
   const [generatingPattern, setGeneratingPattern] = useState(false);
   const [patternError, setPatternError] = useState<string | null>(null);
   const [engine, setEngine] = useState<{ mode: "llm" | "local"; label: string } | null>(null);
@@ -414,33 +421,49 @@ export function PersonalWorkshop({
     }
 
     try {
-      const paintSnapshot = cloth ? cloth.snapshot() : undefined;
+      const paintSnapshot =
+        cloth && !cloth.isBlank ? cloth.snapshot() : undefined;
       const mockWorksRaw = window.localStorage.getItem("mock_works");
       const mockWorks: unknown = mockWorksRaw ? JSON.parse(mockWorksRaw) : [];
       if (!Array.isArray(mockWorks)) {
         throw new Error("本地作品数据格式异常，请检查 mock_works。");
       }
 
+      const workState: SavedWorkState = {
+        styleId: activeStyle.id,
+        techniqueId: technique.id,
+        palette: [baseColor, dyeColor, accentColor],
+        params: activeParams,
+        seed,
+        ...(isEmbroidery ? { patternId, layout, motifScale } : {}),
+        theme,
+        textureDensity,
+        paintStrokes,
+        generatedPattern,
+        appliedPatternUrl,
+        paint: paintSnapshot,
+      };
+      const savedWork = saveWork({
+        ...workState,
+        workState,
+      });
+
       mockWorks.unshift({
-        id: `work-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-        image: appliedPatternUrl ?? generatedPattern?.imageUrl ?? paintSnapshot ?? "",
-        createdAt: Date.now(),
+        id: savedWork.id,
+        image:
+          appliedPatternUrl ??
+          generatedPattern?.imageUrl ??
+          paintSnapshot ??
+          "",
+        createdAt: savedWork.createdAt,
         username: userInfo.username,
+        workState,
       });
       window.localStorage.setItem(
         "mock_works",
         JSON.stringify(mockWorks.slice(0, 60)),
       );
 
-      saveWork({
-        styleId: activeStyle.id,
-        techniqueId: technique.id,
-        palette: [baseColor, dyeColor, accentColor],
-        params: activeParams,
-        seed,
-        paint: cloth && !cloth.isBlank ? paintSnapshot : undefined,
-        ...(isEmbroidery ? { patternId, layout, motifScale } : {}),
-      });
       setSavedFlash(true);
       if (flashTimer.current) clearTimeout(flashTimer.current);
       flashTimer.current = setTimeout(() => setSavedFlash(false), 1600);
@@ -473,6 +496,90 @@ export function PersonalWorkshop({
       setGroup(first.group ?? "长裙");
     }
   }, [initialStyleCategory, setStyle]);
+
+  useEffect(() => {
+    if (!workId || requestedWorkId.current === workId) return;
+    requestedWorkId.current = workId;
+
+    const savedWork = listWorks().find((work) => work.id === workId);
+    if (!savedWork) {
+      toast.error("找不到要恢复的作品，可能已被删除。");
+      return;
+    }
+
+    const savedState: SavedWorkState = savedWork.workState ?? {
+      styleId: savedWork.styleId,
+      techniqueId: savedWork.techniqueId,
+      palette: savedWork.palette,
+      params: savedWork.params,
+      seed: savedWork.seed,
+      patternId: savedWork.patternId,
+      layout: savedWork.layout,
+      motifScale: savedWork.motifScale,
+      textureDensity: 3,
+      paintStrokes: savedWork.paint ? 1 : 0,
+      generatedPattern: null,
+      appliedPatternUrl: null,
+      paint: savedWork.paint,
+    };
+
+    setTechnique(savedState.techniqueId);
+    setStyle(savedState.styleId);
+    if (savedState.palette[1]) setDyeColor(savedState.palette[1]);
+    if (savedState.palette[2]) setAccentColor(savedState.palette[2]);
+    if (savedState.patternId) {
+      setPattern(savedState.patternId as typeof patternId);
+    }
+    if (savedState.layout) setLayout(savedState.layout as typeof layout);
+    if (typeof savedState.motifScale === "number") {
+      setMotifScale(savedState.motifScale);
+    }
+    setTheme(savedState.theme ?? "");
+    Object.entries(savedState.params).forEach(([key, value]) => {
+      setParam(key, value);
+    });
+    setRestoreWorkState(savedState);
+  }, [
+    workId,
+    setTechnique,
+    setStyle,
+    setDyeColor,
+    setAccentColor,
+    setPattern,
+    setLayout,
+    setMotifScale,
+    setTheme,
+    setParam,
+  ]);
+
+  useEffect(() => {
+    if (
+      !workId ||
+      !restoreWorkState ||
+      !cloth ||
+      activeStyle.id !== restoreWorkState.styleId ||
+      restoredWorkId.current === workId
+    ) {
+      return;
+    }
+    restoredWorkId.current = workId;
+
+    setTextureDensity(restoreWorkState.textureDensity);
+    setGeneratedPattern(restoreWorkState.generatedPattern ?? null);
+    setAppliedPatternUrl(restoreWorkState.appliedPatternUrl ?? null);
+    setPaintOn(true);
+
+    if (restoreWorkState.paint) {
+      cloth.reset();
+      void cloth
+        .applySketch(restoreWorkState.paint)
+        .then(() => setPaintStrokes(restoreWorkState.paintStrokes))
+        .catch(() => toast.error("作品参数已恢复，但布面贴图加载失败。"));
+    } else {
+      cloth.reset();
+      setPaintStrokes(0);
+    }
+  }, [workId, restoreWorkState, cloth, activeStyle.id]);
 
   function chooseStyle(id: string) {
     setStyle(id);

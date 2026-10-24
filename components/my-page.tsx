@@ -222,7 +222,7 @@ export function MyPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Link
-                          href="/studio/personal"
+                          href={`/studio/personal/${technique.category}?workId=${encodeURIComponent(work.id)}`}
                           className="text-[10.5px] text-dye-700/70 underline-offset-2 hover:text-dye-900 hover:underline"
                         >
                           继续调整
