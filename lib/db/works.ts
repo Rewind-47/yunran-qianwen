@@ -26,6 +26,7 @@ export interface SavedWorkState {
   generatedPattern?: { imageUrl: string; model: string } | null;
   appliedPatternUrl?: string | null;
   paint?: string;
+  previewImage?: string;
 }
 
 export interface SavedWork {
@@ -50,6 +51,8 @@ export interface SavedWork {
   paint?: string;
   /** 继续调整所需的完整工坊状态 */
   workState?: SavedWorkState;
+  /** 最终 3D 预览画布的 PNG 截图 */
+  previewImage?: string;
 }
 
 const MAX_WORKS = 60;
@@ -77,6 +80,11 @@ function sanitize(value: unknown): SavedWork[] {
       motifScale: typeof w.motifScale === "number" ? w.motifScale : undefined,
       paint: typeof w.paint === "string" && w.paint.startsWith("data:image") ? w.paint : undefined,
       workState,
+      previewImage:
+        typeof w.previewImage === "string" &&
+        w.previewImage.startsWith("data:image/png")
+          ? w.previewImage
+          : undefined,
     });
   }
   return out.slice(0, MAX_WORKS);
@@ -124,6 +132,11 @@ function sanitizeWorkState(value: unknown): SavedWorkState | undefined {
     paint:
       typeof state.paint === "string" && state.paint.startsWith("data:image")
         ? state.paint
+        : undefined,
+    previewImage:
+      typeof state.previewImage === "string" &&
+      state.previewImage.startsWith("data:image/png")
+        ? state.previewImage
         : undefined,
   };
 }

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PatternSwatch } from "@/components/pattern-swatch";
-import { GarmentShot } from "@/components/garment-shot";
+import { StyleSilhouette } from "@/components/style-silhouette";
 import { EmbroiderySwatch } from "@/components/embroidery-swatch";
 import { AgentTrace } from "@/components/agent-trace";
 import { Button } from "@/components/ui/button";
@@ -235,6 +235,10 @@ export function PersonalWorkshop({
 
   const [view, setView] = useState<ViewAngle>("quarter");
   const [textureDensity, setTextureDensity] = useState(3);
+  const capture3DRef = useRef<(() => string) | null>(null);
+  const handleCaptureReady = useCallback((capture: (() => string) | null) => {
+    capture3DRef.current = capture;
+  }, []);
   // 布面图层：模型本体永远是一件白坯布，只有这里被涂过的地方才有颜色。
   const [cloth, setCloth] = useState<ClothPaint | null>(null);
   const [paintStrokes, setPaintStrokes] = useState(0);
@@ -421,6 +425,11 @@ export function PersonalWorkshop({
     }
 
     try {
+      const previewImage = capture3DRef.current?.();
+      if (!previewImage) {
+        throw new Error("3D 预览尚未就绪，请稍候再保存。");
+      }
+
       const paintSnapshot =
         cloth && !cloth.isBlank ? cloth.snapshot() : undefined;
       const mockWorksRaw = window.localStorage.getItem("mock_works");
@@ -442,21 +451,21 @@ export function PersonalWorkshop({
         generatedPattern,
         appliedPatternUrl,
         paint: paintSnapshot,
+        previewImage,
       };
       const savedWork = saveWork({
         ...workState,
         workState,
+        previewImage,
       });
 
       mockWorks.unshift({
         id: savedWork.id,
-        image:
-          appliedPatternUrl ??
-          generatedPattern?.imageUrl ??
-          paintSnapshot ??
-          "",
+        image: previewImage,
+        previewImage,
         createdAt: savedWork.createdAt,
         username: userInfo.username,
+        avatar: userInfo.avatar,
         workState,
       });
       window.localStorage.setItem(
@@ -900,14 +909,7 @@ export function PersonalWorkshop({
                 title={`${s.name} · ${s.tags.join(" / ")}`}
               >
                 <div className="relative aspect-[4/5] w-full bg-[#F7F6F3]">
-                  <GarmentShot
-                    style={s}
-                    technique={technique}
-                    params={activeParams}
-                    seed={seed}
-                    dye={styleId === s.id}
-                    className="absolute inset-0"
-                  />
+                  <StyleSilhouette style={s} />
                   {library.favorites.includes(s.id) && (
                     <span className="absolute right-1.5 top-1.5 text-[10px] text-madder-400">★</span>
                   )}
@@ -1600,6 +1602,7 @@ export function PersonalWorkshop({
                   textureDensity={textureDensity}
                   patternImageUrl={appliedPatternUrl}
                   onPatternImageError={handlePatternImageError}
+                  onCaptureReady={handleCaptureReady}
                   fallback={
                     <div className="relative h-full w-full">
                       {isEmbroidery ? (

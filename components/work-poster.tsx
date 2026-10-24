@@ -44,6 +44,19 @@ export function WorkPoster({
   const technique = useMemo(() => workTechnique(work), [work]);
   const style = styleMap[work.styleId];
 
+  if (work.imageUrl) {
+    return (
+      <div className={cn("relative h-full w-full overflow-hidden", className)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={work.imageUrl}
+          alt={work.title}
+          className={cn("h-full w-full object-cover", canvasClassName)}
+        />
+      </div>
+    );
+  }
+
   if (!technique) {
     return <div className={cn("bg-[#F6F5F1]", className)} />;
   }

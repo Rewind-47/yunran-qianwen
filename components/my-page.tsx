@@ -179,7 +179,14 @@ export function MyPage() {
                   className="group overflow-hidden rounded-card border border-dye-900/10 bg-white/60 transition-shadow duration-500 hover:shadow-[0_18px_44px_-30px_rgba(16,31,47,0.5)]"
                 >
                   <div className="relative aspect-[4/3] bg-[#F6F5F1]">
-                    {style ? (
+                    {work.previewImage ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={work.previewImage}
+                        alt={`${style?.name ?? "扎染作品"} 3D 成品预览`}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : style ? (
                       <GarmentShot
                         style={style}
                         technique={technique}

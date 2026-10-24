@@ -9,7 +9,7 @@ export default function GalleryPage() {
       <SectionHeading
         eyebrow="DIGITAL GALLERY"
         title="纹样图鉴"
-        description="十二枚纹样，对应六种捆扎技法。每一枚都能点开看它的寓意、用途与技法要点，也可以直接听一段解说。"
+        description="十枚纹样，涵盖多种传统防染技法。每一枚都能点开看它的寓意、用途与技法要点，也可以直接听一段解说。"
       />
       <div className="mt-10">
         <GalleryGrid />

@@ -82,6 +82,21 @@ interface ViewerApi {
   reset: () => void;
 }
 
+function CanvasCaptureRegistration({
+  onReady,
+}: {
+  onReady?: (capture: (() => string) | null) => void;
+}) {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    onReady?.(() => gl.domElement.toDataURL("image/png"));
+    return () => onReady?.(null);
+  }, [gl, onReady]);
+
+  return null;
+}
+
 export interface GarmentViewerProps {
   technique: Technique;
   params: Record<string, number>;
@@ -102,6 +117,8 @@ export interface GarmentViewerProps {
   onPatternImageError?: (message: string) => void;
   /** 布面纹样重复密度 */
   textureDensity?: number;
+  /** 3D renderer 准备好后提供画布截图函数 */
+  onCaptureReady?: (capture: (() => string) | null) => void;
   className?: string;
   fallback?: ReactNode;
 }
@@ -120,6 +137,7 @@ export function GarmentViewer({
   patternImageUrl = null,
   onPatternImageError,
   textureDensity = 1,
+  onCaptureReady,
   className,
   fallback,
 }: GarmentViewerProps) {
@@ -233,6 +251,8 @@ export function GarmentViewer({
           onPointerDown={grab}
           onDoubleClick={() => api.current?.reset()}
         >
+          <CanvasCaptureRegistration onReady={onCaptureReady} />
+
           {/* 环境贴图：用 Lightformer 现场烘，不请求外部 HDR，弱网也能出图 */}
           <Environment resolution={256} frames={1}>
             <Lightformer intensity={2.6} position={[0, 7, -4]} scale={[14, 9, 1]} color="#ffffff" />

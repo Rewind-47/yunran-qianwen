@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AuthorAvatar } from "@/components/author-avatar";
 import { AgentTrace } from "@/components/agent-trace";
 import { WorkPoster } from "@/components/work-poster";
+import { PublishModal, type PublishPayload } from "@/components/publish-modal";
 import { Badge } from "@/components/ui/badge";
 import {
   communityAuthorMap,
   communityTopics,
   communityWorks,
+  type CommunityAuthor,
   type CommunityWork,
 } from "@/lib/data/community";
 import { techniqueCategories, techniqueMap } from "@/lib/data/techniques";
@@ -17,6 +19,8 @@ import { toggleFollow, toggleLike, toggleSave, useCommunity } from "@/lib/db/com
 import { formatCount } from "@/lib/utils";
 import type { AgentStep } from "@/lib/types";
 import type { TechniqueCategory } from "@/lib/types";
+import { useUserStore } from "@/store/use-user-store";
+import { toast } from "sonner";
 
 const sorts = [
   { id: "recommend", label: "推荐" },
@@ -25,6 +29,7 @@ const sorts = [
 ] as const;
 
 type SortId = (typeof sorts)[number]["id"];
+const PUBLISHED_WORKS_KEY = "mock_gallery";
 
 const craftFilters: { id: "all" | TechniqueCategory; label: string }[] = [
   { id: "all", label: "全部" },
@@ -44,24 +49,142 @@ export function InspirationFeed() {
   const [current, setCurrent] = useState<CommunityWork | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [running, setRunning] = useState(false);
+  const [publishedWorks, setPublishedWorks] = useState<CommunityWork[]>([]);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishImageUrl, setPublishImageUrl] = useState("");
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const userInfo = useUserStore((state) => state.userInfo);
+  const openLoginModal = useUserStore((state) => state.openLoginModal);
 
   const community = useCommunity();
 
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PUBLISHED_WORKS_KEY);
+      if (!saved) return;
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) {
+        throw new Error("本地广场作品数据格式异常。");
+      }
+      const validWorks = parsed.filter(
+        (work): work is CommunityWork =>
+          Boolean(work) &&
+          typeof work === "object" &&
+          typeof work.id === "string" &&
+          typeof work.title === "string" &&
+          typeof work.authorId === "string" &&
+          typeof work.techniqueId === "string" &&
+          typeof work.imageUrl === "string" &&
+          Array.isArray(work.palette) &&
+          Array.isArray(work.comments),
+      );
+      setPublishedWorks(validWorks);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? `读取已发布作品失败：${error.message}`
+          : "读取已发布作品失败。",
+      );
+    }
+  }, []);
+
   const list = useMemo(() => {
+    const allWorks = [...publishedWorks, ...communityWorks];
     const rows =
       craft === "all"
-        ? [...communityWorks]
-        : communityWorks.filter((w) => techniqueMap[w.techniqueId]?.category === craft);
-    if (sort === "new") return rows;
+        ? allWorks
+        : allWorks.filter((w) => techniqueMap[w.techniqueId]?.category === craft);
+    if (sort === "new") {
+      return rows.sort(
+        (a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0),
+      );
+    }
     if (sort === "hot") return rows.sort((a, b) => b.likes - a.likes);
     // 推荐：本周精选优先，其余按收藏数
     return rows.sort((a, b) => {
+      const userPublished =
+        Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
+      if (userPublished !== 0) return userPublished;
       const f = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
       return f !== 0 ? f : b.saves - a.saves;
     });
-  }, [sort, craft]);
+  }, [sort, craft, publishedWorks]);
 
   const topics = useMemo(() => communityTopics(6), []);
+
+  function beginPublish() {
+    if (!isLoggedIn || !userInfo) {
+      toast.error("请先登录后再发布作品");
+      openLoginModal();
+      return;
+    }
+
+    try {
+      const savedWorks = window.localStorage.getItem("mock_works");
+      const parsed: unknown = savedWorks ? JSON.parse(savedWorks) : [];
+      const latestImage =
+        Array.isArray(parsed) && parsed.length > 0
+          ? parsed[0]?.previewImage
+          : "";
+      setPublishImageUrl(typeof latestImage === "string" ? latestImage : "");
+    } catch {
+      toast.error("读取本地作品图片失败，请重新上传图片后发布。");
+      setPublishImageUrl("");
+    }
+    setPublishOpen(true);
+  }
+
+  function handlePublish(payload: PublishPayload) {
+    if (!userInfo) {
+      toast.error("登录状态已失效，请重新登录后发布。");
+      openLoginModal();
+      setPublishOpen(false);
+      return;
+    }
+
+    const now = Date.now();
+    const username = userInfo.username;
+    const authorId = `local-${encodeURIComponent(username)}`;
+    const work: CommunityWork = {
+      id: `published-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      title: payload.title,
+      authorId,
+      authorName: username,
+      authorAvatar: userInfo.avatar,
+      techniqueId: "spiral",
+      styleId: "dress-01",
+      palette: ["#F6F1E6", "#172E44", "#9FBEDA"],
+      params: {},
+      seed: `published-${now}`,
+      note: payload.description || "分享一件新创作。",
+      tags: [],
+      likes: 0,
+      saves: 0,
+      views: 0,
+      at: new Date(now).toLocaleString("zh-CN"),
+      publishedAt: now,
+      imageUrl: payload.imageUrl,
+      featured: false,
+      comments: [],
+    };
+    const nextWorks = [work, ...publishedWorks];
+
+    try {
+      window.localStorage.setItem(
+        PUBLISHED_WORKS_KEY,
+        JSON.stringify([...nextWorks, ...communityWorks]),
+      );
+      setPublishedWorks(nextWorks);
+      setPublishOpen(false);
+      toast.success("作品已发布到灵感广场");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? `发布失败：${error.message}`
+          : "发布失败，请稍后重试。",
+      );
+    }
+  }
 
   async function askAi(work: CommunityWork) {
     setCurrent(work);
@@ -102,6 +225,17 @@ export function InspirationFeed() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div>
+        <div className="mb-5 flex justify-end">
+          <button
+            type="button"
+            onClick={beginPublish}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-blue-900 px-5 text-sm font-medium text-white shadow-lg shadow-blue-900/15 transition hover:-translate-y-0.5 hover:bg-blue-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+          >
+            <span aria-hidden className="text-lg leading-none">＋</span>
+            发布我的创作
+          </button>
+        </div>
+
         {/* 筛选条 */}
         <div className="flex flex-wrap items-center gap-2">
           {craftFilters.map((f) => (
@@ -142,7 +276,17 @@ export function InspirationFeed() {
         {/* 成品网格 */}
         <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((work) => {
-            const author = communityAuthorMap[work.authorId];
+            const author: CommunityAuthor = communityAuthorMap[work.authorId] ?? {
+              id: work.authorId,
+              name: work.authorName ?? "创作者",
+              handle: work.authorName ?? "creator",
+              initial: work.authorName?.trim().charAt(0) || "创",
+              role: "云染拾光创作者",
+              bio: work.note,
+              followers: 0,
+              works: 1,
+              hue: "#1E3F5C",
+            };
             const liked = community.liked.includes(work.id);
             const saved = community.saved.includes(work.id);
             const following = community.following.includes(author.id);
@@ -162,7 +306,11 @@ export function InspirationFeed() {
 
                   {/* 整块可点，按钮浮在上面 */}
                   <Link
-                    href={`/studio/inspiration/${work.id}`}
+                    href={
+                      work.imageUrl
+                        ? "/studio/inspiration"
+                        : `/studio/inspiration/${work.id}`
+                    }
                     aria-label={`查看 ${work.title}`}
                     className="absolute inset-0 z-10"
                   />
@@ -201,7 +349,16 @@ export function InspirationFeed() {
                 {/* 信息区 */}
                 <div className="flex flex-1 flex-col border-t border-dye-900/8 px-4 py-3.5">
                   <div className="flex items-center gap-2">
-                    <AuthorAvatar author={author} size={24} />
+                    {work.authorAvatar ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={work.authorAvatar}
+                        alt=""
+                        className="h-6 w-6 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <AuthorAvatar author={author} size={24} />
+                    )}
                     <span className="min-w-0 flex-1 truncate text-[11.5px] text-dye-800/60">
                       {author.name}
                       {author.badge && (
@@ -223,12 +380,18 @@ export function InspirationFeed() {
                     </button>
                   </div>
 
-                  <Link
-                    href={`/studio/inspiration/${work.id}`}
-                    className="mt-2.5 block truncate font-song text-[15px] font-semibold text-dye-900 transition-colors hover:text-dye-700"
-                  >
-                    {work.title}
-                  </Link>
+                  {work.imageUrl ? (
+                    <p className="mt-2.5 truncate font-song text-[15px] font-semibold text-dye-900">
+                      {work.title}
+                    </p>
+                  ) : (
+                    <Link
+                      href={`/studio/inspiration/${work.id}`}
+                      className="mt-2.5 block truncate font-song text-[15px] font-semibold text-dye-900 transition-colors hover:text-dye-700"
+                    >
+                      {work.title}
+                    </Link>
+                  )}
 
                   <p className="mt-1.5 line-clamp-2 text-[11.5px] leading-relaxed text-dye-800/50">
                     {work.note}
@@ -250,13 +413,20 @@ export function InspirationFeed() {
                       <span className="text-[12px] leading-none">★</span>
                       {formatCount(work.saves + (saved ? 1 : 0))}
                     </span>
-                    <Link
-                      href={`/studio/inspiration/${work.id}#comments`}
-                      className="flex items-center gap-1 transition-colors hover:text-dye-900"
-                    >
-                      <span className="text-[12px] leading-none">✎</span>
-                      {commentCount}
-                    </Link>
+                    {work.imageUrl ? (
+                      <span className="flex items-center gap-1">
+                        <span className="text-[12px] leading-none">✎</span>
+                        {commentCount}
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/studio/inspiration/${work.id}#comments`}
+                        className="flex items-center gap-1 transition-colors hover:text-dye-900"
+                      >
+                        <span className="text-[12px] leading-none">✎</span>
+                        {commentCount}
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={() => askAi(work)}
@@ -278,7 +448,11 @@ export function InspirationFeed() {
           <div className="flex items-center justify-between gap-2">
             <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">创作参谋</p>
             {current && (
-              <Badge tone="cloth">{communityAuthorMap[current.authorId]?.name}</Badge>
+              <Badge tone="cloth">
+                {communityAuthorMap[current.authorId]?.name ??
+                  current.authorName ??
+                  "创作者"}
+              </Badge>
             )}
           </div>
 
@@ -330,6 +504,12 @@ export function InspirationFeed() {
           </p>
         </div>
       </aside>
+      <PublishModal
+        isOpen={publishOpen}
+        imageUrl={publishImageUrl}
+        onClose={() => setPublishOpen(false)}
+        onPublish={handlePublish}
+      />
     </div>
   );
 }

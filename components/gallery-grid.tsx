@@ -5,63 +5,68 @@ import { useMemo, useState } from "react";
 import { PatternSwatch } from "@/components/pattern-swatch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { patterns } from "@/lib/data/patterns";
+import { galleryPatterns } from "@/lib/data/gallery-patterns";
 import { techniques, techniqueMap } from "@/lib/data/techniques";
 import { cn, difficultyLabel } from "@/lib/utils";
 import type { Pattern } from "@/lib/types";
 
 export function GalleryGrid() {
-  const [activeTechnique, setActiveTechnique] = useState<string>("all");
+  const [activeFamily, setActiveFamily] = useState<string>("all");
   const [keyword, setKeyword] = useState("");
   const [selected, setSelected] = useState<Pattern | null>(null);
 
-  // 只展示图鉴里确实收录了纹样的工艺，避免出现点了却空列表的筛选项
-  const usedTechniques = useMemo(() => {
-    const ids = new Set(patterns.map((p) => p.techniqueId));
-    return techniques.filter((t) => ids.has(t.id));
+  // 只展示这 10 枚纹样实际涉及的工艺家族，避免出现空筛选项
+  const usedFamilies = useMemo(() => {
+    const ids = new Set(galleryPatterns.map((pattern) => pattern.techniqueId));
+    return [...new Set(
+      techniques
+        .filter((technique) => ids.has(technique.id))
+        .map((technique) => technique.family),
+    )];
   }, []);
 
   const filtered = useMemo(() => {
     const k = keyword.trim();
-    return patterns.filter((p) => {
-      const byTech = activeTechnique === "all" || p.techniqueId === activeTechnique;
+    return galleryPatterns.filter((p) => {
+      const family = techniqueMap[p.techniqueId]?.family;
+      const byFamily = activeFamily === "all" || family === activeFamily;
       const byKey =
         !k ||
         p.name.includes(k) ||
         p.meaning.includes(k) ||
         p.region.includes(k) ||
         (techniqueMap[p.techniqueId]?.name ?? "").includes(k);
-      return byTech && byKey;
+      return byFamily && byKey;
     });
-  }, [activeTechnique, keyword]);
+  }, [activeFamily, keyword]);
 
   return (
     <div>
       {/* 筛选 */}
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setActiveTechnique("all")}
+          onClick={() => setActiveFamily("all")}
           className={cn(
             "rounded-full border px-4 py-1.5 text-[13px] transition-colors",
-            activeTechnique === "all"
+            activeFamily === "all"
               ? "border-dye-700 bg-dye-700 text-cloth-50"
               : "border-dye-900/15 text-dye-800/70 hover:border-dye-700/40",
           )}
         >
           全部
         </button>
-        {usedTechniques.map((t) => (
+        {usedFamilies.map((family) => (
           <button
-            key={t.id}
-            onClick={() => setActiveTechnique(t.id)}
+            key={family}
+            onClick={() => setActiveFamily(family)}
             className={cn(
               "rounded-full border px-4 py-1.5 text-[13px] transition-colors",
-              activeTechnique === t.id
+              activeFamily === family
                 ? "border-dye-700 bg-dye-700 text-cloth-50"
                 : "border-dye-900/15 text-dye-800/70 hover:border-dye-700/40",
             )}
           >
-            {t.name}
+            {family}
           </button>
         ))}
         <div className="ml-auto w-full sm:w-56">

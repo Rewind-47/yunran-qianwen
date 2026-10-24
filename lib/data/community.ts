@@ -64,6 +64,11 @@ export interface CommunityWork {
   /** 是否本周精选 */
   featured?: boolean;
   comments: CommunityComment[];
+  /** 用户发布的本地图片及作者信息 */
+  imageUrl?: string;
+  authorName?: string;
+  authorAvatar?: string | null;
+  publishedAt?: number;
   /** 刺绣作品的题材三件套 */
   patternId?: EmbroideryPatternId;
   layout?: StitchLayout;
