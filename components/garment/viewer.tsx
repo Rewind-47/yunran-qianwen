@@ -100,6 +100,8 @@ export interface GarmentViewerProps {
   /** 同源代理后的 AI 纹样图片；应用到所有衣料贴图 */
   patternImageUrl?: string | null;
   onPatternImageError?: (message: string) => void;
+  /** 布面纹样重复密度 */
+  textureDensity?: number;
   className?: string;
   fallback?: ReactNode;
 }
@@ -117,6 +119,7 @@ export function GarmentViewer({
   paint = null,
   patternImageUrl = null,
   onPatternImageError,
+  textureDensity = 1,
   className,
   fallback,
 }: GarmentViewerProps) {
@@ -283,6 +286,7 @@ export function GarmentViewer({
               paint={paint}
               patternImageUrl={patternImageUrl}
               onPatternImageError={onPatternImageError}
+              textureDensity={textureDensity}
             />
           </Suspense>
 
@@ -401,6 +405,7 @@ function ModelStage({
   paint,
   patternImageUrl,
   onPatternImageError,
+  textureDensity,
 }: {
   technique: Technique;
   params: Record<string, number>;
@@ -416,6 +421,7 @@ function ModelStage({
   paint?: GarmentPaint | null;
   patternImageUrl?: string | null;
   onPatternImageError?: (message: string) => void;
+  textureDensity: number;
 }) {
   const spec = carrierMap[carrier] ?? carrierMap.scarf;
   // 刺绣不做满幅重复：一块布上只有一处主纹，贴图 1:1 铺一次。
@@ -432,7 +438,17 @@ function ModelStage({
     : embroidered
       ? [tube && !scanned ? 0.25 : 0, 0]
       : [0, 0];
-  const procedural = useClothTexture(technique, params, seed, repeat, offset);
+  const densityRepeat = useMemo<[number, number]>(
+    () => [repeat[0] * textureDensity, repeat[1] * textureDensity],
+    [repeat[0], repeat[1], textureDensity],
+  );
+  const procedural = useClothTexture(
+    technique,
+    params,
+    seed,
+    densityRepeat,
+    offset,
+  );
   const Model = models[carrier] ?? models.scarf;
 
   const group = useRef<THREE.Group>(null);
@@ -456,10 +472,6 @@ function ModelStage({
         }
 
         texture.colorSpace = THREE.SRGBColorSpace;
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(2.5, 3.2);
-        texture.offset.set(0.1, -0.2);
         texture.needsUpdate = true;
         const root = group.current;
         if (!root) {
@@ -482,29 +494,7 @@ function ModelStage({
 
             context.save();
             context.globalCompositeOperation = "multiply";
-            const tileWidth = canvas.width / texture.repeat.x;
-            const tileHeight = canvas.height / texture.repeat.y;
-            const startX = texture.offset.x * canvas.width;
-            const startY = texture.offset.y * canvas.height;
-            for (
-              let y = startY - tileHeight;
-              y < canvas.height;
-              y += tileHeight
-            ) {
-              for (
-                let x = startX - tileWidth;
-                x < canvas.width;
-                x += tileWidth
-              ) {
-                context.drawImage(
-                  texture.image,
-                  x,
-                  y,
-                  tileWidth,
-                  tileHeight,
-                );
-              }
-            }
+            context.drawImage(texture.image, 0, 0, canvas.width, canvas.height);
             context.restore();
             material.map.needsUpdate = true;
             applied += 1;
@@ -608,6 +598,7 @@ function ModelStage({
       engine={paint.engine}
       surface={technique.surface}
       weave={scannedStyle ? 0.22 : 1}
+      repeat={densityRepeat}
     />
   ) : (
     <FabricMaterial

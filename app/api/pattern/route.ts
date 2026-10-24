@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     const result = await textToImage({
       prompt,
       negativePrompt:
-        "文字，水印，商标，塑料质感，非布料材质，立体布料，衣物，织物褶皱，布料起伏，透视，阴影，高光，反光，3D效果，实物摄影，场景背景，No perfect symmetry, no geometric shapes, no digital printing effect",
+        "文字，水印，商标，塑料质感，非布料材质，立体布料，衣物，织物褶皱，布料起伏，透视，阴影，高光，反光，3D效果，实物摄影，场景背景，No perfect symmetry, no geometric shapes, no digital printing effect, sharp edges, digital noise, glitch, stripes",
     });
     return NextResponse.json(result);
   } catch (error) {

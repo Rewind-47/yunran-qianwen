@@ -225,6 +225,7 @@ export function PersonalWorkshop({
   const [library, setLibrary] = useState<UserStyleLibrary>(EMPTY_LIBRARY);
 
   const [view, setView] = useState<ViewAngle>("quarter");
+  const [textureDensity, setTextureDensity] = useState(3);
   // 布面图层：模型本体永远是一件白坯布，只有这里被涂过的地方才有颜色。
   const [cloth, setCloth] = useState<ClothPaint | null>(null);
   const [paintStrokes, setPaintStrokes] = useState(0);
@@ -1452,6 +1453,7 @@ export function PersonalWorkshop({
                   style={activeStyle.shape}
                   view={view}
                   paint={paintBinding}
+                  textureDensity={textureDensity}
                   patternImageUrl={appliedPatternUrl}
                   onPatternImageError={handlePatternImageError}
                   fallback={
@@ -1480,8 +1482,27 @@ export function PersonalWorkshop({
                 />
               </div>
 
+              <label className="absolute inset-x-4 bottom-12 mx-auto flex max-w-xs items-center gap-3 rounded-full border border-dye-900/10 bg-cloth-50/90 px-4 py-2 text-[11px] text-dye-800/70 shadow-sm backdrop-blur-sm">
+                <span className="shrink-0">纹理密度</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={6}
+                  step={0.5}
+                  value={textureDensity}
+                  onChange={(event) =>
+                    setTextureDensity(Number(event.target.value))
+                  }
+                  aria-label="纹理密度"
+                  className="min-w-0 flex-1 accent-dye-700"
+                />
+                <span className="w-6 shrink-0 text-right font-mono">
+                  {textureDensity.toFixed(1)}×
+                </span>
+              </label>
+
               {/* 机位切换 */}
-              <div className="absolute inset-x-0 bottom-4 flex justify-center sm:bottom-5 lg:bottom-6">
+              <div className="absolute inset-x-0 bottom-3 flex justify-center">
                 <div className="flex items-center gap-0.5 rounded-full border border-dye-900/10 bg-cloth-50/85 p-1 backdrop-blur-sm">
                   {viewLabels.map((v) => (
                     <button
@@ -1517,7 +1538,7 @@ export function PersonalWorkshop({
               </span>
 
               {/* 涂鸦工具条：笔法跟着工艺走，也可以自己换 */}
-              <div className="absolute inset-x-0 bottom-14 flex justify-center sm:bottom-16">
+              <div className="absolute inset-x-0 bottom-24 flex justify-center">
                 <div className="flex max-w-[95%] flex-wrap items-center gap-1 rounded-full border border-dye-900/10 bg-cloth-50/90 px-1.5 py-1 backdrop-blur-sm">
                   {(
                     [

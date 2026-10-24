@@ -219,14 +219,13 @@ export function deriveHem(name: string, flare = 0.5): HemStyle {
 }
 
 /**
- * 每品类挑 2 款「精选」：判定标准是扎染放得开——
+ * 每品类挑选「精选」：判定标准是扎染放得开——
  * 幅面够大、版型本身留白多，纹样不会被结构切碎。
  * 工坊的选款区只展示这两款，其余款式留在库里供检索与作品引用。
  */
 const FEATURED_NAMES = new Set([
-  // 连衣裙（长裙 5 款 + 短裙 1 款，均为实物扫描件，全部上架）
+  // 连衣裙（长裙 4 款 + 短裙 1 款，均为实物扫描件，全部上架）
   "垂坠吊带长裙",
-  "百褶马面长裙",
   "交领齐腰襦裙",
   "大袖交领襦裙",
   "立领盘扣马面裙",
@@ -237,6 +236,7 @@ const FEATURED_NAMES = new Set([
   // 半身裙
   "伞裙",
   "马面裙",
+  "百褶马面长裙",
   // 帽饰
   "扎染渔夫帽",
   "贝雷帽",
@@ -346,6 +346,31 @@ const skirtSeeds: Seed[] = [
   ["垂坠缎面长裙", "DRAPE SATIN", "礼服", { len: 0.95, flare: 0.55, waist: 0.5 }, 80],
   ["扎染棉麻长裙", "TIE-DYE LINEN", "度假/文艺", { len: 0.9, flare: 0.8, waist: 0.6 }, 92],
   ["白族扎染围裙裙", "BAI APRON SKIRT", "新中式/手作", { len: 0.75, flare: 0.7, waist: 0.75 }, 85],
+  [
+    "百褶马面长裙",
+    "PLEATED MAMIAN",
+    "新中式/礼服",
+    {
+      glb: {
+        src: "/models/mamian-1-scanned.glb",
+        shot: "skirt",
+        scale: 0.85,
+        ground: -0.42,
+        radius: 3.4,
+        targetY: -0.05,
+        info: {
+          spec: "实物扫描 80 × 85 × 48 cm",
+          fabric: "仿妆花织锦，褶位热定型",
+          structure: "摄影测量扫描件 · 6 万面单网格 · 重算柱面 UV",
+        },
+      },
+      len: 0.85,
+      flare: 0.62,
+      pleats: 18,
+      waist: 0.8,
+    },
+    95,
+  ],
 ];
 
 /* ------------------------------------------------------------------ */
@@ -388,32 +413,6 @@ const dressSeeds: Seed[] = [
       sleeve: 0,
     },
     96,
-    "长裙",
-  ],
-  [
-    "百褶马面长裙",
-    "PLEATED MAMIAN",
-    "新中式/礼服",
-    {
-      glb: {
-        src: "/models/mamian-1-scanned.glb",
-        shot: "skirt",
-        scale: 0.85,
-        ground: -0.42,
-        radius: 3.4,
-        targetY: -0.05,
-        info: {
-          spec: "实物扫描 80 × 85 × 48 cm",
-          fabric: "仿妆花织锦，褶位热定型",
-          structure: "摄影测量扫描件 · 6 万面单网格 · 重算柱面 UV",
-        },
-      },
-      len: 0.85,
-      flare: 0.62,
-      pleats: 18,
-      waist: 0.8,
-    },
-    95,
     "长裙",
   ],
   [
@@ -769,7 +768,7 @@ const textileSeeds: Seed[] = [
   ["椅垫", "CHAIR PAD", "居家", { model: "cushion", len: 0.4, flare: 0.4, depth: 0.25 }, 76],
   ["飘窗垫", "WINDOW PAD", "居家", { model: "cushion", len: 0.6, flare: 0.8, depth: 0.25 }, 72],
   ["蒲团", "FLOOR CUSHION", "居家/新中式", { model: "cushion", len: 0.65, flare: 0.65, depth: 0.6 }, 74],
-  ["扎染靠枕", "TIE-DYE CUSHION", "手作/居家", { model: "cushion", len: 0.5, flare: 0.5, depth: 0.5 }, 94],
+  ["扎染围裙", "TIE-DYE CUSHION", "手作/居家", { model: "cushion", len: 0.5, flare: 0.5, depth: 0.5 }, 94],
   ["扎染抱枕", "TIE-DYE PILLOW", "手作/居家", { model: "cushion", len: 0.65, flare: 0.65, depth: 0.55 }, 92],
   ["刺绣靠枕", "EMBROIDERED CUSHION", "新中式/居家", { model: "cushion", len: 0.5, flare: 0.5, depth: 0.5 }, 88],
   ["拼布坐垫", "PATCHWORK PAD", "手作/居家", { model: "cushion", len: 0.45, flare: 0.45, depth: 0.3 }, 78],
@@ -779,14 +778,13 @@ const textileSeeds: Seed[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* 七、家居围裙 2 款（靠枕从布艺拆到「家居布艺」，这里补两款围裙）        */
+/* 七、家居布艺 2 款（靠枕从布艺拆到「家居布艺」，这里补充扫描款）        */
 /* ------------------------------------------------------------------ */
 
 const homeSeeds: Seed[] = [
-  // 这一款的三维预览用用户提供的扫描靠枕（build-pillow.mjs 产出），
-  // 不再走程序化围裙放样；款式名、工艺与涂鸦流程都不变。
+  // 这一款的三维预览使用用户提供的扫描靠枕（build-pillow.mjs 产出），数据模型保持不变。
   [
-    "扎染围裙",
+    "扎染靠枕",
     "TIE-DYE APRON",
     "手作/居家",
     {

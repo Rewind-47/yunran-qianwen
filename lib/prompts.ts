@@ -220,6 +220,9 @@ export function buildImagePrompt(
     isTieDye
       ? "Asymmetrical, random scattered pattern, watercolor wash effect, uneven indigo dye absorption, ink bleed edges"
       : "",
+    isTieDye
+      ? "Soft watercolor diffusion, smooth gradient bleeding, cloud-like texture, abstract organic shapes, no horizontal stripes, no glitch effect"
+      : "",
     "只生成铺满画面的平面扎染花纹方块图，纹样连续重复、边缘可无缝拼接；不出现衣物、服装轮廓、实体布料、模特、道具、场景或任何背景，不使用透视、褶皱、纹理起伏、光影或摄影效果",
   ]
     .filter(Boolean)

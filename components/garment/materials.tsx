@@ -271,14 +271,25 @@ export function PaintFabricMaterial({
   engine,
   surface,
   weave = 1,
+  repeat = [1, 1],
 }: {
   engine: ClothPaint;
   surface: SurfaceFinish;
   /** 织纹法线强度，扫描件要调低（见 FabricMaterial.weave） */
   weave?: number;
+  repeat?: [number, number];
 }) {
   const layerId = useMemo(() => engine.createLayer(), [engine]);
   const texture = engine.layerTexture(layerId);
+
+  useEffect(() => {
+    if (!texture) return;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeat[0], repeat[1]);
+    texture.needsUpdate = true;
+  }, [repeat, texture]);
+
   if (!texture) return null;
   return (
     <FabricMaterial texture={texture} surface={surface} paintLayerId={layerId} weave={weave} />

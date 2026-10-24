@@ -83,6 +83,9 @@ const getTechniqueDetail: ToolDefinition<{ techniqueId: string }> = {
 export const IMAGE_NEGATIVE_PROMPT =
   "机器印花, 数码印花, 徽标, 文字, 水印, 塑料质感, 过度饱和, 日式扎染, 日本传统服饰, 数码绘画, 立体布料, 衣物, 织物褶皱, 透视, 阴影, 高光, 反光, 3D效果, 实物摄影, 场景背景, No perfect symmetry, no geometric shapes, no digital printing effect";
 
+const TIE_DYE_NEGATIVE_PROMPT =
+  "sharp edges, digital noise, glitch, stripes";
+
 const generateImage: ToolDefinition<{
   techniqueId: string;
   params: Record<string, number>;
@@ -124,7 +127,10 @@ const generateImage: ToolDefinition<{
 
     const { imageUrl, model } = await textToImage({
       prompt,
-      negativePrompt: IMAGE_NEGATIVE_PROMPT,
+      negativePrompt:
+        t.category === "tie"
+          ? `${IMAGE_NEGATIVE_PROMPT}, ${TIE_DYE_NEGATIVE_PROMPT}`
+          : IMAGE_NEGATIVE_PROMPT,
       size: "1024*1024",
     });
 
