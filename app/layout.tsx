@@ -4,6 +4,7 @@ import "./fonts.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooterGate } from "@/components/site-footer-gate";
 import { ChatDock } from "@/components/chat-dock";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: {
@@ -27,6 +28,7 @@ export default function RootLayout({
         <main>{children}</main>
         <SiteFooterGate />
         <ChatDock />
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );

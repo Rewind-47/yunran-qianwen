@@ -52,6 +52,8 @@ import {
   type PaintTool,
 } from "@/lib/render/cloth-paint";
 import { useStudioStore } from "@/store/studio";
+import { useUserStore } from "@/store/use-user-store";
+import { toast } from "sonner";
 import { cn, difficultyLabel } from "@/lib/utils";
 import type { AgentStep, Technique, TechniqueCategory } from "@/lib/types";
 import type { GarmentPaint, ViewAngle } from "@/components/garment/viewer";
@@ -163,6 +165,10 @@ export function PersonalWorkshop({
   family?: TechniqueCategory;
   initialStyleCategory?: StyleCategory;
 }) {
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const openLoginModal = useUserStore((state) => state.openLoginModal);
+  const userInfo = useUserStore((state) => state.userInfo);
+
   const {
     techniqueId,
     styleId,
@@ -401,18 +407,49 @@ export function PersonalWorkshop({
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function saveWorkSnapshot() {
-    saveWork({
-      styleId: activeStyle.id,
-      techniqueId: technique.id,
-      palette: [baseColor, dyeColor, accentColor],
-      params: activeParams,
-      seed,
-      paint: cloth && !cloth.isBlank ? cloth.snapshot() : undefined,
-      ...(isEmbroidery ? { patternId, layout, motifScale } : {}),
-    });
-    setSavedFlash(true);
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-    flashTimer.current = setTimeout(() => setSavedFlash(false), 1600);
+    if (!isLoggedIn || !userInfo) {
+      toast.error("请先登录后再保存作品");
+      openLoginModal();
+      return;
+    }
+
+    try {
+      const paintSnapshot = cloth ? cloth.snapshot() : undefined;
+      const mockWorksRaw = window.localStorage.getItem("mock_works");
+      const mockWorks: unknown = mockWorksRaw ? JSON.parse(mockWorksRaw) : [];
+      if (!Array.isArray(mockWorks)) {
+        throw new Error("本地作品数据格式异常，请检查 mock_works。");
+      }
+
+      mockWorks.unshift({
+        id: `work-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        image: appliedPatternUrl ?? generatedPattern?.imageUrl ?? paintSnapshot ?? "",
+        createdAt: Date.now(),
+        username: userInfo.username,
+      });
+      window.localStorage.setItem(
+        "mock_works",
+        JSON.stringify(mockWorks.slice(0, 60)),
+      );
+
+      saveWork({
+        styleId: activeStyle.id,
+        techniqueId: technique.id,
+        palette: [baseColor, dyeColor, accentColor],
+        params: activeParams,
+        seed,
+        paint: cloth && !cloth.isBlank ? paintSnapshot : undefined,
+        ...(isEmbroidery ? { patternId, layout, motifScale } : {}),
+      });
+      setSavedFlash(true);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setSavedFlash(false), 1600);
+      toast.success("作品已安全保存到我的图库");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? `作品保存失败：${error.message}` : "作品保存失败，请稍后重试。",
+      );
+    }
   }
 
   function chooseCategory(id: StyleCategory) {

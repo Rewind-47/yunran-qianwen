@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { LoginModal } from "@/components/login-modal";
+import { useUserStore } from "@/store/use-user-store";
 
 const nav = [
   { href: "/", label: "首页" },
@@ -54,6 +56,96 @@ function Brand() {
   );
 }
 
+function AccountControl() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const userInfo = useUserStore((state) => state.userInfo);
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const logout = useUserStore((state) => state.logout);
+  const isLoginModalOpen = useUserStore((state) => state.isLoginModalOpen);
+  const openLoginModal = useUserStore((state) => state.openLoginModal);
+  const closeLoginModal = useUserStore((state) => state.closeLoginModal);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        event.target instanceof Node &&
+        !accountRef.current?.contains(event.target)
+      ) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  return (
+    <>
+      {!isLoggedIn || !userInfo ? (
+        <button
+          type="button"
+          onClick={openLoginModal}
+          className="shrink-0 rounded-full border border-dye-700/25 bg-white/55 px-4 py-2 text-[13px] text-dye-800 transition-colors hover:border-dye-700/45 hover:bg-white/80"
+        >
+          登录 / 注册
+        </button>
+      ) : (
+        <div ref={accountRef} className="relative shrink-0">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+            className="inline-flex items-center gap-2 rounded-full border border-dye-900/12 bg-white/55 py-1.5 pl-1.5 pr-3 text-[13px] text-dye-900 transition-colors hover:bg-white/85"
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-dye-700 text-xs font-medium text-cloth-50">
+              {userInfo.username.trim().charAt(0).toUpperCase() || "用"}
+            </span>
+            <span className="max-w-28 truncate">{userInfo.username}</span>
+            <span aria-hidden className="text-[10px] text-dye-700/60">
+              ▾
+            </span>
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-2 min-w-36 rounded-xl border border-dye-900/10 bg-cloth-50 p-1.5 shadow-lg"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  logout();
+                  setMenuOpen(false);
+                }}
+                className="w-full rounded-lg px-3 py-2 text-left text-[13px] text-dye-800 transition-colors hover:bg-dye-900/5 hover:text-dye-950"
+              >
+                退出登录
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={closeLoginModal}
+      />
+    </>
+  );
+}
+
 export function SiteHeader() {
   const pathname = usePathname();
   const scrolled = useScrolled();
@@ -88,15 +180,18 @@ export function SiteHeader() {
             )}
           </div>
 
-          <Link
-            href="/"
-            className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-dye-900/12 bg-white/50 px-3.5 py-2 text-[12.5px] text-dye-800/70 transition-colors duration-300 hover:border-dye-700/35 hover:text-dye-900"
-          >
-            <span className="transition-transform duration-300 group-hover:-translate-x-0.5">
-              ←
-            </span>
-            返回首页
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/"
+              className="group inline-flex items-center gap-1.5 rounded-full border border-dye-900/12 bg-white/50 px-3.5 py-2 text-[12.5px] text-dye-800/70 transition-colors duration-300 hover:border-dye-700/35 hover:text-dye-900"
+            >
+              <span className="transition-transform duration-300 group-hover:-translate-x-0.5">
+                ←
+              </span>
+              返回首页
+            </Link>
+            <AccountControl />
+          </div>
         </div>
       </header>
     );
@@ -143,6 +238,7 @@ export function SiteHeader() {
           >
             开始创作
           </Link>
+          <AccountControl />
         </div>
       </div>
 
