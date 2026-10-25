@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { PatternSwatch } from "@/components/pattern-swatch";
 import { ClothBackdrop, RuleLine, SectionTag } from "@/components/section-chrome";
 import {
@@ -16,117 +15,53 @@ import { cn } from "@/lib/utils";
  * 所以这里不必再迁就右栏的高度，可以按「染程」本身来排。
  *
  * 版面分两段：
- *   A. 染程带 —— 同一块布的四张状态：坯布（缚线与扎结）→ 入缸（沉在水下的布影）
- *      → 出缸氧化（褶缝里上浅下深）→ 拆线显形（同心晕圈）。四张全部用 CSS 叠出来，
- *      不占图片预算，却能一眼讲清「白布怎么变成花的」。
+ *   A. 染程带 —— 用四张实拍图呈现扎、浸、晾、成四道工序。
  *      每张上方压一道 2px 色线，颜色就是这一步布的颜色：米 → 黄绿 → 蓝 → 深靛。
  *   B. 工艺谱 —— 三段三类，扎染与印染各占满一行五格（印染第五格放一页「原理」），
  *      刺绣八法压成一条密排的针法带。行高由疏到密，本身就在说「越往后针法越细」。
  */
 
-/**
- * 四道工序。四张图里挂的是同一块布 —— 同一位置、同一幅面、同一条下摆，
- * 只是所处的时间不同。环境（桌面、液面、天光）换，布的形态不换，
- * 四格并排时读者看到的才是一条工序，而不是四块色板。
- */
+/** 四道工序对应的实拍图与说明。 */
 const steps: {
   cn: string;
   en: string;
   desc: string;
+  image: string;
+  alt: string;
   /** 工序色阶：这一步布的颜色，画在每格顶上的 2px 线上 */
   tint: string;
-  /** 环境：桌面 / 缸里的液面 / 天光 */
-  env: CSSProperties;
-  /** 布：四格是同一块，只是状态不同 */
-  cloth: CSSProperties;
 }[] = [
   {
     cn: "扎",
     en: "Bind",
     desc: "线、木片、豆粒缚住要留白的位置。缚得越紧，靛蓝越进不来——拆线之后留下的就是纹。",
+    image: "/images/process/step-zha.jpg",
+    alt: "扎染工序：缚扎布料",
     tint: "#CDBEA1",
-    // 坯布色的桌面，光从左上来
-    env: {
-      backgroundColor: "#EDE5D3",
-      backgroundImage:
-        "radial-gradient(120% 90% at 18% -10%, rgba(255,255,255,0.55), transparent 62%), linear-gradient(180deg,#F1EADC 0%,#E3D9C4 100%)",
-    },
-    // 白坯布：两向缚线，四个扎结，结下一圈压痕
-    cloth: {
-      backgroundColor: "#FDFBF6",
-      backgroundImage: [
-        "repeating-linear-gradient(42deg, rgba(30,63,92,0.17) 0 1px, transparent 1px 10px)",
-        "repeating-linear-gradient(-42deg, rgba(30,63,92,0.12) 0 1px, transparent 1px 10px)",
-        "radial-gradient(circle at 29% 27%, rgba(23,46,68,0.6) 0 7px, rgba(23,46,68,0.18) 7px 11px, transparent 11px)",
-        "radial-gradient(circle at 71% 32%, rgba(23,46,68,0.54) 0 6px, rgba(23,46,68,0.16) 6px 10px, transparent 10px)",
-        "radial-gradient(circle at 36% 70%, rgba(23,46,68,0.52) 0 6px, rgba(23,46,68,0.16) 6px 10px, transparent 10px)",
-        "radial-gradient(circle at 73% 73%, rgba(23,46,68,0.58) 0 8px, rgba(23,46,68,0.18) 8px 12px, transparent 12px)",
-      ].join(","),
-    },
   },
   {
     cn: "浸",
     en: "Dip",
     desc: "板蓝根靛缸冷染，浸透后提起接触空气，再浸再提。深浅由浸染次数定，不由染料浓度定。",
+    image: "/images/process/step-jin.jpg",
+    alt: "扎染工序：布料浸入染缸",
     tint: "#B6B15C",
-    // 缸里的液面：上缘有反光，缸底压暗
-    env: {
-      backgroundColor: "#6E6A2F",
-      backgroundImage:
-        "linear-gradient(180deg,#8A8642 0%,#6E6A2F 46%,#4A471C 100%), radial-gradient(120% 40% at 20% 6%, rgba(255,255,255,0.24), transparent 62%)",
-    },
-    // 提起的半截布：整片吃成黄绿，中段一道浸痕，底边还挂着水色
-    cloth: {
-      backgroundColor: "#CFCA80",
-      backgroundImage: [
-        "linear-gradient(180deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.08) 26%, rgba(88,84,32,0.26) 60%, rgba(88,84,32,0.48) 100%)",
-        "repeating-linear-gradient(90deg, rgba(255,255,255,0.12) 0 2px, rgba(0,0,0,0.08) 2px 5px, transparent 5px 24px)",
-      ].join(","),
-    },
   },
   {
     cn: "晾",
     en: "Oxidize",
     desc: "出缸的布是黄绿色的，在风里氧化几分钟才转成蓝。这一道看天，阴天要等得更久。",
+    image: "/images/process/step-liang.jpg",
+    alt: "扎染工序：染后的布料晾晒氧化",
     tint: "#2A5578",
-    // 院墙与天光：冷白偏蓝
-    env: {
-      backgroundColor: "#DCE6EE",
-      backgroundImage:
-        "radial-gradient(110% 80% at 76% -6%, rgba(255,255,255,0.8), transparent 58%), linear-gradient(180deg,#E6EEF4 0%,#CDDBE6 62%,#BCCEDB 100%)",
-    },
-    // 出缸转蓝：上浅下深（氧化由外向里推进），竖纹是竹竿压出的褶
-    cloth: {
-      backgroundColor: "#4A7CA0",
-      backgroundImage: [
-        "linear-gradient(180deg,#A3BDD1 0%,#4A7CA0 34%,#23506F 74%,#16304A 100%)",
-        "repeating-linear-gradient(90deg, rgba(255,255,255,0.12) 0 2px, rgba(0,0,0,0.1) 2px 5px, transparent 5px 26px)",
-      ].join(","),
-    },
   },
   {
     cn: "成",
     en: "Unfold",
     desc: "拆去缚线，纹样一次性显形。同一套缚法也扎不出两块一样的布——这是它最不肯让步的地方。",
+    image: "/images/process/step-cheng.jpg",
+    alt: "扎染工序：拆线后显现的纹样",
     tint: "#101F2F",
-    // 还是那张桌面：同一块布，回到了桌上
-    env: {
-      backgroundColor: "#EDE5D3",
-      backgroundImage:
-        "radial-gradient(120% 90% at 18% -10%, rgba(255,255,255,0.55), transparent 62%), linear-gradient(180deg,#F1EADC 0%,#E3D9C4 100%)",
-    },
-    // 拆线之后的同心晕圈：边界是晕开的，不是硬切的
-    cloth: {
-      backgroundColor: "#FBF8F1",
-      backgroundImage: [
-        // 放射折线：缚线勒出的那几十道褶
-        "repeating-conic-gradient(from 0deg at 50% 50%, rgba(23,46,68,0.34) 0deg 2.4deg, rgba(251,248,241,0) 2.4deg 9deg)",
-        // 晕圈：由内向外三圈，边界是晕开的
-        "radial-gradient(circle at 50% 50%, rgba(23,46,68,0.78) 0 4%, rgba(23,46,68,0.2) 6%, transparent 8%)",
-        "radial-gradient(circle at 50% 50%, transparent 20%, rgba(23,46,68,0.52) 23%, rgba(23,46,68,0.44) 27%, transparent 30%)",
-        "radial-gradient(circle at 50% 50%, transparent 42%, rgba(23,46,68,0.36) 45%, rgba(23,46,68,0.3) 50%, transparent 53%)",
-      ].join(","),
-    },
   },
 ];
 
@@ -201,7 +136,7 @@ export function CraftShowcase({
             <span className="eyebrow text-[8.5px] text-dye-700/45">Dyeing Sequence</span>
             <span className="h-px flex-1 bg-gradient-to-r from-dye-900/12 to-transparent" />
             <span className="figure text-[10.5px] tracking-[0.12em] text-dye-700/45">
-              同一块布的四次转身
+              扎染工序的四个阶段
             </span>
           </div>
 
@@ -214,36 +149,13 @@ export function CraftShowcase({
                   className="block h-[2px] w-full"
                   style={{ backgroundColor: s.tint }}
                 />
-                <div
-                  className="relative mt-3 aspect-[3/2] w-full overflow-hidden rounded-[3px] ring-1 ring-dye-900/[0.12] shadow-[0_14px_28px_-24px_rgba(16,31,47,0.65)] transition-transform duration-500 ease-soft hover:scale-[1.015]"
-                  style={s.env}
-                  role="img"
-                  aria-label={`工序「${s.cn}」的布面状态`}
-                >
-                  {/* 同一块布：四格的位置、幅面、下摆完全一致 */}
-                  <span
-                    aria-hidden
-                    className="absolute inset-x-[17%] top-[13%] bottom-[11%] overflow-hidden shadow-[0_12px_20px_-14px_rgba(16,31,47,0.5)]"
-                    style={{
-                      borderRadius: "1px 1px 20% 20% / 1px 1px 7% 7%",
-                    }}
-                  >
-                    <span className="absolute inset-0" style={s.cloth} />
-                    {/* 布纹：经纬两向的极细线，把色块压成一块布 */}
-                    <span
-                      aria-hidden
-                      className="absolute inset-0 opacity-60 mix-blend-overlay [background-image:repeating-linear-gradient(0deg,rgba(255,255,255,0.18)_0_1px,transparent_1px_3px),repeating-linear-gradient(90deg,rgba(0,0,0,0.1)_0_1px,transparent_1px_3px)]"
-                    />
-                    {/* 布边收暗：两侧各压一道，布才有厚度 */}
-                    <span
-                      aria-hidden
-                      className="absolute inset-0 [background:linear-gradient(90deg,rgba(16,31,47,0.16),transparent_14%,transparent_86%,rgba(16,31,47,0.16)),linear-gradient(180deg,rgba(255,255,255,0.14),transparent_22%)]"
-                    />
-                  </span>
-                  {/* 环境受光：上缘一道柔光，下缘压暗，四格同一个来光方向 */}
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 [background:radial-gradient(130%_90%_at_50%_-14%,rgba(255,255,255,0.18),transparent_58%),radial-gradient(110%_80%_at_50%_118%,rgba(16,31,47,0.22),transparent_62%)]"
+                <div className="relative mt-3 aspect-[3/2] w-full overflow-hidden rounded-[3px] ring-1 ring-dye-900/[0.12] shadow-[0_14px_28px_-24px_rgba(16,31,47,0.65)] transition-transform duration-500 ease-soft hover:scale-[1.015]">
+                  <Image
+                    src={s.image}
+                    alt={s.alt}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-cover"
                   />
                 </div>
                 <div className="mt-3 flex items-baseline gap-2.5">

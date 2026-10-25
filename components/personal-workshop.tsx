@@ -23,11 +23,6 @@ import {
   stitchLayouts,
 } from "@/lib/data/embroidery";
 import {
-  accentSwatches,
-  dyeSwatches,
-  palettes,
-} from "@/lib/data/palettes";
-import {
   shapeSummary,
   styleCategories,
   styleMap,
@@ -38,7 +33,6 @@ import { styleDb } from "@/lib/db/style-db";
 import { listWorks, saveWork, type SavedWorkState } from "@/lib/db/works";
 import {
   readLibrary,
-  rememberColor,
   rememberStyle,
   toggleFavorite,
   type UserStyleLibrary,
@@ -62,7 +56,7 @@ import type { GarmentPaint, ViewAngle } from "@/components/garment/viewer";
 /**
  * 个性工坊。
  *
- * 与上一版最大的区别：先选「品类 + 款式」，再选工艺和颜色。
+ * 与上一版最大的区别：先选「品类 + 款式」，再选工艺与工艺参数。
  * 八个品类覆盖服饰 / 帽饰 / 发饰 / 箱包 / 围巾披肩 / 家居布艺，
  * 每个品类只摆几款精选（全库 300 余款仍在库里），每款都带廓形参数，
  * 所以换款不是换一张缩略图，而是真的把 3D 模型重新放样一遍。
@@ -102,63 +96,6 @@ const EMPTY_LIBRARY: UserStyleLibrary = {
   colors: [],
 };
 
-/** 取色器：一个圆点，点开是系统调色板 */
-function ColorWell({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (hex: string) => void;
-  label: string;
-}) {
-  return (
-    <label
-      className="relative h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-full border border-dye-900/15 shadow-inner"
-      title="打开取色器"
-    >
-      <span className="block h-full w-full" style={{ background: value }} />
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value.toUpperCase())}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        aria-label={label}
-      />
-    </label>
-  );
-}
-
-/** 小色点 */
-function Dot({
-  hex,
-  active,
-  onClick,
-  title,
-}: {
-  hex: string;
-  active: boolean;
-  onClick: () => void;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      className={cn(
-        "h-5 w-5 rounded-full border transition-transform duration-200 hover:scale-110",
-        active
-          ? "border-dye-900 ring-2 ring-dye-700/25"
-          : "border-white/80 shadow-[inset_0_0_0_1px_rgba(16,31,47,0.12)]",
-      )}
-      style={{ background: hex }}
-    />
-  );
-}
-
 export function PersonalWorkshop({
   family,
   initialStyleCategory,
@@ -175,7 +112,6 @@ export function PersonalWorkshop({
   const {
     techniqueId,
     styleId,
-    paletteId,
     baseColor,
     dyeColor,
     accentColor,
@@ -186,7 +122,6 @@ export function PersonalWorkshop({
     motifScale,
     setTechnique,
     setStyle,
-    setPalette,
     setDyeColor,
     setAccentColor,
     setParam,
@@ -609,10 +544,6 @@ export function PersonalWorkshop({
     }
   }
 
-  function choosePalette(id: string) {
-    setPalette(id);
-  }
-
   async function generatePattern() {
     if (generatingPattern) return;
     setGeneratingPattern(true);
@@ -663,15 +594,6 @@ export function PersonalWorkshop({
 
   function chooseLayout(id: typeof layout) {
     setLayout(id);
-  }
-
-  function pickDye(hex: string) {
-    setDyeColor(hex);
-    setLibrary(rememberColor(hex));
-  }
-
-  function pickAccent(hex: string) {
-    setAccentColor(hex);
   }
 
   function undoPaint() {
@@ -751,10 +673,10 @@ export function PersonalWorkshop({
     }
   }
 
-  // 刺绣多一节「选图案」，后面几节的序号整体后移，避免出现两个「四」
+  // 刺绣多一节「选图案」，后续序号相应后移。
   const sec = isEmbroidery
-    ? { pattern: "四", color: "五", param: "六", agent: "七", process: "八" }
-    : { pattern: "", color: "四", param: "五", agent: "六", process: "七" };
+    ? { pattern: "四", param: "五", agent: "六", process: "七" }
+    : { pattern: "", param: "四", agent: "五", process: "六" };
 
   return (
     <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
@@ -1172,155 +1094,7 @@ export function PersonalWorkshop({
           </section>
         )}
 
-        {/* 四 / 五、颜色 */}
-        <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
-          <div className="flex items-baseline justify-between">
-            <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">
-              {sec.color}、定颜色
-            </p>
-            <span className="text-[10.5px] text-dye-800/40">
-              {isEmbroidery ? "底布 + 双色丝线" : "白坯布 + 自选染料"}
-            </span>
-          </div>
-
-          {/* 坯布：固定白色，解释清楚为什么 */}
-          <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-dye-900/10 bg-white/70 px-2.5 py-2">
-            <span
-              className="h-8 w-8 shrink-0 rounded-full border border-dye-900/15"
-              style={{ background: baseColor }}
-            />
-            <div className="min-w-0">
-              <p className="text-[11.5px] text-dye-900">
-                {isEmbroidery ? "底布" : "坯布底"} ·{" "}
-                <span className="font-mono text-[10.5px]">{baseColor}</span>
-              </p>
-              <p className="text-[10px] leading-relaxed text-dye-800/45">
-                {isEmbroidery
-                  ? "刺绣是在布上做加法，底布不动，所以先定布色再定丝线"
-                  : "扎染的留白就是布本色，所以底布不参与染色"}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-3">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] text-dye-900">
-                  {isEmbroidery ? "主线" : "主染"}
-                </span>
-                <span className="font-mono text-[11px] text-dye-700">{dyeColor}</span>
-              </div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <ColorWell
-                  value={dyeColor}
-                  onChange={pickDye}
-                  label={isEmbroidery ? "选择主丝线颜色" : "选择主染颜色"}
-                />
-                <div className="flex flex-wrap gap-1.5">
-                  {dyeSwatches.map((s) => (
-                    <Dot
-                      key={s.hex}
-                      hex={s.hex}
-                      active={dyeColor.toUpperCase() === s.hex}
-                      onClick={() => pickDye(s.hex)}
-                      title={`${s.name} ${s.hex}`}
-                    />
-                  ))}
-                </div>
-              </div>
-              {library.colors.length > 0 && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <span className="text-[9.5px] text-dye-800/35">最近</span>
-                  {library.colors.map((c) => (
-                    <Dot
-                      key={c}
-                      hex={c}
-                      active={dyeColor.toUpperCase() === c}
-                      onClick={() => pickDye(c)}
-                      title={c}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] text-dye-900">
-                  {isEmbroidery ? "辅线" : "辅染"}
-                </span>
-                <span className="font-mono text-[11px] text-dye-700">{accentColor}</span>
-              </div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <ColorWell
-                  value={accentColor}
-                  onChange={pickAccent}
-                  label={isEmbroidery ? "选择辅丝线颜色" : "选择辅染颜色"}
-                />
-                <div className="flex flex-wrap gap-1.5">
-                  {accentSwatches.map((s) => (
-                    <Dot
-                      key={s.hex}
-                      hex={s.hex}
-                      active={accentColor.toUpperCase() === s.hex}
-                      onClick={() => pickAccent(s.hex)}
-                      title={`${s.name} ${s.hex}`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <p className="mt-1.5 text-[10px] leading-relaxed text-dye-800/40">
-                {isEmbroidery
-                  ? "主线定花瓣与主体，辅线走花心、叶脉与勾边，两色拉开层次"
-                  : "辅染决定晕圈过渡与高光，主染决定成衣的主色调"}
-              </p>
-            </div>
-          </div>
-
-          {!isEmbroidery && (
-            <div className="mt-3 border-t border-dye-900/10 pt-2.5">
-              <div className="flex items-baseline justify-between">
-                <span className="text-[10.5px] text-dye-800/45">传统草木染配方</span>
-                <span className="text-[9.5px] text-dye-800/30">点选只改染料色</span>
-              </div>
-              <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-                {palettes.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => choosePalette(p.id)}
-                    className={cn(
-                      "overflow-hidden rounded-md border transition-all",
-                      paletteId === p.id
-                        ? "border-dye-700 ring-1 ring-dye-700/25"
-                        : "border-dye-900/12 hover:border-dye-700/35",
-                    )}
-                    title={p.source}
-                  >
-                    <span className="flex h-5 w-full">
-                      {p.colors.map((c) => (
-                        <span key={c} style={{ background: c }} className="flex-1" />
-                      ))}
-                    </span>
-                    <span className="block truncate px-1 py-1 text-[9px] text-dye-800/60">
-                      {p.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isEmbroidery && (
-            <div className="mt-3 border-t border-dye-900/10 pt-2.5">
-              <p className="text-[10px] leading-relaxed text-dye-800/40">
-                丝线配色讲究「和色」：同色系分档过渡，冷暖各一支，才绣得出花瓣的转折。
-                上面两组色点既是染料，也是绣线的色谱。
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* 五 / 六、参数 */}
+        {/* 四 / 五、调工艺 */}
         <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
           <div className="flex items-center justify-between">
             <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">
@@ -1417,7 +1191,7 @@ export function PersonalWorkshop({
             </div>
           )}
         </section>
-        {/* 七 / 六、AI 方案：规划、工具调用、自检与建议都留在同一栏，点完直接看结果 */}
+        {/* 六 / 五、AI 方案：规划、工具调用、自检与建议都留在同一栏，点完直接看结果 */}
         <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
           <div className="flex items-baseline justify-between gap-3">
             <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">
@@ -1486,7 +1260,7 @@ export function PersonalWorkshop({
           </div>
         </section>
 
-        {/* 八 / 七、工艺流程 */}
+        {/* 七 / 六、工艺流程 */}
         <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
           <div className="flex items-baseline justify-between">
             <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">
