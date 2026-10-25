@@ -163,7 +163,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
       {/* 面包屑 */}
       <div className="flex items-center gap-2 text-[11.5px] text-dye-800/45">
         <Link
-          href="/studio/inspiration"
+          href="/inspiration"
           className="rounded-full border border-dye-900/12 bg-white/50 px-2.5 py-1 transition-colors hover:border-dye-700/35 hover:text-dye-900"
         >
           ← 灵感广场
@@ -367,7 +367,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
                 {siblings.slice(0, 3).map((s) => (
                   <Link
                     key={s.id}
-                    href={`/studio/inspiration/${s.id}`}
+                    href={`/inspiration/${s.id}`}
                     className="group flex items-center gap-3"
                   >
                     <div className="h-14 w-11 shrink-0 overflow-hidden rounded-lg border border-dye-900/10 bg-[#F4F2EC]">
@@ -526,7 +526,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
             {siblings.slice(0, 3).map((s) => (
               <Link
                 key={s.id}
-                href={`/studio/inspiration/${s.id}`}
+                href={`/inspiration/${s.id}`}
                 className="group flex overflow-hidden rounded-card border border-dye-900/10 bg-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-float"
               >
                 <div className="h-24 w-20 shrink-0 overflow-hidden bg-[#F4F2EC]">
@@ -550,7 +550,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
       <nav className="mt-10 flex items-center justify-between gap-3 border-t border-dye-900/10 pt-5">
         {prev ? (
           <Link
-            href={`/studio/inspiration/${prev.id}`}
+            href={`/inspiration/${prev.id}`}
             className="group min-w-0 text-left text-[11.5px] text-dye-800/50 transition-colors hover:text-dye-900"
           >
             <span className="block text-[10px] tracking-[0.16em] text-dye-800/30">上一件</span>
@@ -561,7 +561,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
         )}
         {next ? (
           <Link
-            href={`/studio/inspiration/${next.id}`}
+            href={`/inspiration/${next.id}`}
             className="min-w-0 text-right text-[11.5px] text-dye-800/50 transition-colors hover:text-dye-900"
           >
             <span className="block text-[10px] tracking-[0.16em] text-dye-800/30">下一件</span>

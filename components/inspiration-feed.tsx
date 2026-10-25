@@ -308,8 +308,8 @@ export function InspirationFeed() {
                   <Link
                     href={
                       work.imageUrl
-                        ? "/studio/inspiration"
-                        : `/studio/inspiration/${work.id}`
+                        ? "/inspiration"
+                        : `/inspiration/${work.id}`
                     }
                     aria-label={`查看 ${work.title}`}
                     className="absolute inset-0 z-10"
@@ -386,7 +386,7 @@ export function InspirationFeed() {
                     </p>
                   ) : (
                     <Link
-                      href={`/studio/inspiration/${work.id}`}
+                      href={`/inspiration/${work.id}`}
                       className="mt-2.5 block truncate font-song text-[15px] font-semibold text-dye-900 transition-colors hover:text-dye-700"
                     >
                       {work.title}
@@ -420,7 +420,7 @@ export function InspirationFeed() {
                       </span>
                     ) : (
                       <Link
-                        href={`/studio/inspiration/${work.id}#comments`}
+                        href={`/inspiration/${work.id}#comments`}
                         className="flex items-center gap-1 transition-colors hover:text-dye-900"
                       >
                         <span className="text-[12px] leading-none">✎</span>

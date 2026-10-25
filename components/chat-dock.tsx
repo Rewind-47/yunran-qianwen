@@ -43,7 +43,7 @@ interface DragState {
 export function ChatDock() {
   const pathname = usePathname();
   // 工坊是整屏工作台，3D 卡底部有居中工具条，浮钮要往上让一档
-  const raised = pathname?.startsWith("/studio/personal") ?? false;
+  const raised = pathname?.startsWith("/studio") ?? false;
   const [open, setOpen] = useState(false);
   const [booted, setBooted] = useState(false);
   const [ask, setAsk] = useState<{ text: string; id: number } | null>(null);

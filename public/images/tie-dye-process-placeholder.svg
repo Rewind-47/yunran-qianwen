@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8F4EB"/>
+      <stop offset="1" stop-color="#E8E1D3"/>
+    </linearGradient>
+    <linearGradient id="cloth" x1="235" y1="190" x2="930" y2="735" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDFBF6"/>
+      <stop offset="1" stop-color="#D8E4E9"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h1200v900H0z"/>
+  <path d="M0 690c225-68 369-42 568 5 227 53 390 48 632-43v248H0V690Z" fill="#DCE4E3" opacity=".55"/>
+  <path d="m268 212 647-35 79 464-653 74-73-503Z" fill="url(#cloth)" stroke="#AABBC0" stroke-width="5"/>
+  <path d="M304 254c97 17 98 93 171 108 70 15 100-62 174-50 75 12 79 101 153 105 59 4 85-39 127-54" stroke="#4B7890" stroke-width="30" stroke-linecap="round" opacity=".78"/>
+  <path d="M353 420c72-61 132-48 183 3 58 58 102 76 158 27 54-48 104-47 168-2" stroke="#6E91A0" stroke-width="25" stroke-linecap="round" opacity=".68"/>
+  <path d="M416 563c86-69 151-63 210-10 56 51 107 56 164 10" stroke="#315C76" stroke-width="24" stroke-linecap="round" opacity=".7"/>
+  <circle cx="603" cy="439" r="57" stroke="#FBF8F1" stroke-width="15" opacity=".9"/>
+  <circle cx="603" cy="439" r="20" fill="#FBF8F1" opacity=".9"/>
+  <rect x="368" y="745" width="464" height="72" rx="36" fill="#FBF8F1" fill-opacity=".9" stroke="#101F2F" stroke-opacity=".12"/>
+  <text x="600" y="777" fill="#1E3F5C" font-family="sans-serif" font-size="23" text-anchor="middle">扎染工艺配图占位</text>
+  <text x="600" y="801" fill="#172E44" fill-opacity=".55" font-family="sans-serif" font-size="14" text-anchor="middle">可替换为后续实拍素材</text>
+</svg>

@@ -1,7 +1,5 @@
-import { InpaintStudio } from "@/components/inpaint-studio";
-
-export const metadata = { title: "局部重绘" };
+import { redirect } from "next/navigation";
 
 export default function InpaintPage() {
-  return <InpaintStudio />;
+  redirect("/studio/personal/tie#inpaint");
 }

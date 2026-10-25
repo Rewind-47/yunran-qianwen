@@ -1586,7 +1586,7 @@ export function PersonalWorkshop({
           </div>
 
           <div className="relative flex min-h-0 flex-col lg:flex-1">
-            <div className="relative aspect-[4/3] w-full bg-[#F5F4F0] md:aspect-[16/11] lg:aspect-[16/10] [@media(min-width:1024px)_and_(min-height:820px)]:aspect-auto [@media(min-width:1024px)_and_(min-height:820px)]:min-h-0 [@media(min-width:1024px)_and_(min-height:820px)]:flex-1">
+            <div className="relative aspect-[4/3] w-full bg-[#F5F4F0] md:aspect-[16/11] lg:aspect-[16/10]">
               {/* 画框式留白：画布四周（尤其上下）留出呼吸空间，不再顶满面板 */}
               <div className="absolute inset-0 p-3 sm:p-4 lg:p-5">
                 <GarmentViewer

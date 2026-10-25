@@ -270,7 +270,7 @@ export function MyPage() {
               画稿就会出现在这里，随时可以应用到实物。
             </p>
             <Link
-              href="/studio/inpaint"
+              href="/studio/personal/tie#inpaint"
               className="btn-dye mt-5 rounded-full px-5 py-2 text-[12.5px] text-cloth-50"
             >
               去画一张 →
@@ -343,7 +343,7 @@ export function MyPage() {
               方便回头照着染一遍。
             </p>
             <Link
-              href="/studio/inspiration"
+              href="/inspiration"
               className="btn-dye mt-5 rounded-full px-5 py-2 text-[12.5px] text-cloth-50"
             >
               去灵感广场 →
@@ -361,7 +361,7 @@ export function MyPage() {
                   <div className="relative aspect-[4/3] bg-[#F4F2EC]">
                     <WorkPoster work={work} />
                     <Link
-                      href={`/studio/inspiration/${work.id}`}
+                      href={`/inspiration/${work.id}`}
                       aria-label={`查看 ${work.title}`}
                       className="absolute inset-0"
                     />
@@ -382,7 +382,7 @@ export function MyPage() {
                         {author?.name ?? "作者"}
                       </span>
                       <Link
-                        href={`/studio/inspiration/${work.id}`}
+                        href={`/inspiration/${work.id}`}
                         className="text-[10.5px] text-dye-700/70 underline-offset-2 hover:text-dye-900 hover:underline"
                       >
                         看手记与评论 →

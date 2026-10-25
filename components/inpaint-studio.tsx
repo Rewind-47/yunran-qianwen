@@ -527,7 +527,7 @@ export function InpaintStudio() {
     if (!dataUrl) return;
     saveSketch({ techniqueId: technique.id, techniqueName: technique.name, dataUrl });
     setCustomSketch({ id: `${Date.now()}`, dataUrl, name: `手绘 · ${technique.name}` });
-    router.push(`/studio/personal/${technique.category}`);
+    router.push(`/studio/personal/${technique.category}#personal`);
   }
 
   return (

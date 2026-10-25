@@ -11,18 +11,17 @@ const nav = [
   { href: "/", label: "首页" },
   { href: "/gallery", label: "非遗图鉴" },
   { href: "/studio", label: "创作工坊" },
+  { href: "/inspiration", label: "灵感广场" },
   { href: "/me", label: "我的" },
 ];
 
-/** 二级页面的栏目名：分页面只保留「当前在哪 + 回首页」，不再横向跳转 */
+/** 返回当前栏目标题，用于不显示完整导航的二级页面。 */
 function sectionOf(pathname: string): string | undefined {
   if (pathname === "/gallery") return "非遗图鉴";
   if (pathname === "/news" || pathname.startsWith("/news/")) return "资讯中心";
-  if (pathname === "/studio") return "创作工坊";
+  if (pathname.startsWith("/studio")) return "创作工坊";
+  if (pathname.startsWith("/inspiration")) return "灵感广场";
   if (pathname === "/me") return "我的";
-  if (pathname.startsWith("/studio/personal")) return "个性工坊";
-  if (pathname.startsWith("/studio/inspiration")) return "灵感广场";
-  if (pathname.startsWith("/studio/inpaint")) return "局部重绘";
   return undefined;
 }
 
@@ -150,12 +149,13 @@ export function SiteHeader() {
   const pathname = usePathname();
   const scrolled = useScrolled();
 
-  // 首页可跳转到任何栏目；「非遗图鉴」「创作工坊」保留完整导航；其余分页面只留回首页
+  // 首页、主栏目及灵感广场保留完整导航；隐藏的资讯页只提供返回首页
   // 资讯中心是隐藏页：不在导航里，只能从首页点进来，所以这页不给完整导航
   const richNav =
     pathname === "/" ||
     pathname.startsWith("/gallery") ||
     pathname.startsWith("/studio") ||
+    pathname.startsWith("/inspiration") ||
     pathname.startsWith("/me");
   const current = sectionOf(pathname);
 
@@ -233,7 +233,7 @@ export function SiteHeader() {
             非遗数字化 · 文化共创
           </span>
           <Link
-            href="/studio/personal"
+            href="/studio"
             className="btn-dye shrink-0 rounded-full px-4 py-2 text-[13px] text-cloth-50"
           >
             开始创作

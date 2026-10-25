@@ -148,7 +148,17 @@ const ROW_COLS: Record<number, string> = {
   8: "grid-cols-3 sm:grid-cols-4 lg:grid-cols-8",
 };
 
-export function CraftShowcase() {
+interface CraftShowcaseProps {
+  index?: string;
+  cta?: boolean;
+  lede?: string;
+}
+
+export function CraftShowcase({
+  index = "02",
+  cta = true,
+  lede = "工艺不是几个好听的标签：每一种都对应一套自己的参数与纹样生成逻辑，而在这之前，先有四道谁也绕不过去的工序。",
+}: CraftShowcaseProps) {
   return (
     <section id="craft" className="relative overflow-hidden py-16 md:py-20">
       {/* 坯布底：未染之布，正是这一屏「从扎法到成品」的起点 */}
@@ -163,25 +173,26 @@ export function CraftShowcase() {
         {/* 栏目头 */}
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
-            <SectionTag index="02" eyebrow="Craft · From a Knot" className="mb-4" />
+            <SectionTag index={index} eyebrow="Craft · From a Knot" className="mb-4" />
             {/* 窄屏用 clamp 跟随视口：11 个字在 375px 下若固定 30px 会挤掉最后一个字 */}
             <h2 className="title-brush text-[clamp(23px,6.4vw,30px)] leading-[1.3] tracking-[0.02em] text-dye-900 md:text-[38px] md:leading-[1.28]">
               从一种扎法，到一件成品
             </h2>
             <RuleLine />
             <p className="lede mt-4 max-w-xl text-[13.5px] text-dye-800/60">
-              工艺不是几个好听的标签：每一种都对应一套自己的参数与纹样生成逻辑，
-              而在这之前，先有四道谁也绕不过去的工序。
+              {lede}
             </p>
           </div>
-          <div className="shrink-0 pb-1">
-            <Link
-              href="/studio/personal"
-              className="btn-dye inline-flex h-11 items-center rounded-full px-6 text-[13.5px] font-medium text-cloth-50"
-            >
-              去工坊试一件
-            </Link>
-          </div>
+          {cta && (
+            <div className="shrink-0 pb-1">
+              <Link
+                href="/studio/personal"
+                className="btn-dye inline-flex h-11 items-center rounded-full px-6 text-[13.5px] font-medium text-cloth-50"
+              >
+                去工坊试一件
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* ── A 染程带 ───────────────────────────────────────────── */}
