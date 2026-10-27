@@ -1,13 +1,15 @@
 import Image from "next/image";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { ClothBackdrop } from "@/components/section-chrome";
 import { SectionHeading } from "@/components/section-heading";
+import { historyData } from "@/lib/data/history";
 import { cn } from "@/lib/utils";
 
 /**
- * 非遗图鉴 · 新增两节：工艺概述 / 地域流传。
+ * 非遗图鉴 · 新增两节：工艺概述 / 历史脉络。
  *
  * 版式接图鉴原有的「一块坯布往下铺」：01 工艺概述（左文右图）之后紧接着工艺谱，
- * 02 地域流传 从工艺谱结束的那一档米色续下去，中间压一道车缝线。
+ * 02 历史脉络 从工艺谱结束的那一档米色续下去，中间压一道车缝线。
  * 纹样图鉴那一节不在这里 —— 它仍原封不动留在 app/atlas/page.tsx。
  */
 
@@ -176,43 +178,7 @@ export function AtlasOverview() {
   );
 }
 
-/* ─────────────────────────── 02 地域流传 ─────────────────────────── */
-
-/** PLACEHOLDER COPY —— 四段时间与说明同样集中在这里，替换只改这一处。 */
-const LINEAGE = {
-  description:
-    "从染缬入中原，到沿着商道走进洱海边的村落，再到今天被列进非遗名录：一条技艺的路径，往往比一件成品更长。",
-  intro: [
-    "扎染在文献里最早以「绞缬」的名字出现，与夹缬、蜡缬并称三缬。它随人口迁徙与商道南下一路变形：在中原是一种织物装饰，到了苍山洱海之间，成了家家户户都会的手上功夫。",
-    "下面四段只是骨架 —— 每一个时期我们只留了一段最短的说明，等史料与口述整理完再补进来。地域、人物、传习所的名字，都会在这四段里落地。",
-  ],
-  eras: [
-    {
-      period: "汉 — 唐",
-      title: "绞缬见于记载",
-      body: "线缚成花、入染显纹的做法已见于织物与文献，与夹缬、蜡缬并称。此时的纹样多是小簇点状，随织物一起流通。",
-      source: "史料出处待补",
-    },
-    {
-      period: "南诏 — 大理国",
-      title: "沿商道进入洱海",
-      body: "技艺随迁徙与贸易进入云南，与本地白族的用布习惯相遇。蓝靛在苍山脚下有了稳定的来源，染布从副业变成村落生计。",
-      source: "口述与地方志待补",
-    },
-    {
-      period: "明清 — 民国",
-      title: "周城成为染布村",
-      body: "院落里的染缸连成一巷，扎花由家中女性承担，纹样靠母女相传。一块布的用途从自用转向集市，花样开始跟着销路走。",
-      source: "村落档案待补",
-    },
-    {
-      period: "2006 — 至今",
-      title: "列入国家级非遗",
-      body: "白族扎染技艺进入国家级非物质文化遗产名录。传习所、合作社与旅游体验接续进来，技艺的传承从家庭扩展到公共空间。",
-      source: "名录信息待核",
-    },
-  ],
-};
+/* ─────────────────────────── 02 历史脉络 ─────────────────────────── */
 
 export function AtlasLineage() {
   return (
@@ -233,62 +199,12 @@ export function AtlasLineage() {
 
       <div className="relative mx-auto max-w-6xl px-5 pb-14 pt-12">
         <SectionHeading
-          eyebrow="Regional Lineage"
-          title="地域流传"
-          description={LINEAGE.description}
+          eyebrow="Historical Context"
+          title="历史脉络"
+          description="沿时间顺序梳理白族扎染的发展阶段、重要事件及其历史意义。"
         />
 
-        {/* 地域横幅：横向取景，留给地图或村落实拍 */}
-        <AtlasPlate
-          className="mt-9"
-          ratio="aspect-[16/10] sm:aspect-[16/7] md:aspect-[16/6]"
-          label="图 02 · 洱海西岸的染布村落（待补）"
-          hint="/images/atlas/lineage-banner.webp"
-        />
-
-        {/* 引言：宽屏分两栏，像志书的正文 */}
-        <div className="mt-9 max-w-4xl md:columns-2 md:gap-12">
-          {LINEAGE.intro.map((p, i) => (
-            <p
-              key={i}
-              className={cn(
-                "text-[13px] leading-[1.95] text-dye-800/65",
-                i > 0 && "mt-4 md:mt-0",
-              )}
-            >
-              {p}
-            </p>
-          ))}
-        </div>
-
-        {/* 发展历程：左侧年份，右侧说明；行间以细线分隔 */}
-        <ol className="mt-11 border-t border-dye-900/[0.13]">
-          {LINEAGE.eras.map((e, i) => (
-            <li
-              key={e.title}
-              className="grid gap-3 border-b border-dye-900/[0.1] py-7 last:border-b-0 md:grid-cols-[176px_minmax(0,1fr)] md:gap-10"
-            >
-              <div className="flex items-baseline gap-3 md:flex-col md:items-start md:gap-1.5">
-                <span className="figure text-[10.5px] tracking-[0.14em] text-dye-600/55">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="font-latin text-[13px] tracking-[0.08em] text-dye-800/65">
-                  {e.period}
-                </span>
-              </div>
-
-              <div className="min-w-0">
-                <h3 className="title-brush text-[19px] leading-[1.4] text-dye-900">
-                  {e.title}
-                </h3>
-                <p className="mt-2 max-w-2xl text-[12.5px] leading-[1.95] text-dye-800/60">
-                  {e.body}
-                </p>
-                <p className="eyebrow mt-2.5 text-[8px] text-dye-700/35">{e.source}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <HistoryTimeline items={historyData} />
       </div>
     </section>
   );

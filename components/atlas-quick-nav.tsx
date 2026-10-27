@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /**
  * 图鉴快速目录 —— 钉在主站导航正下方的一条「织唛」。
  *
- * 三格等分，对应当前页面的三个板块：工艺概述 / 地域流传 / 纹样图鉴。
+ * 三格等分，对应当前页面的三个板块：工艺概述 / 历史脉络 / 纹样图鉴。
  * 点任一格都在本页内锚点跳转，不新开页面；滚动时当前板块自动高亮。
  *
  * 位置与层级：主站导航是 sticky top-0 h-16（64px），这条紧接在它下面
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  */
 const chapters = [
   { id: "overview", index: "一", label: "工艺概述", en: "Overview" },
-  { id: "lineage", index: "二", label: "地域流传", en: "Lineage" },
+  { id: "lineage", index: "二", label: "历史脉络", en: "History" },
   { id: "patterns", index: "三", label: "纹样图鉴", en: "Patterns" },
 ] as const;
 

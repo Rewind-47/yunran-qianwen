@@ -1,4 +1,5 @@
 import { AtlasQuickNav } from "@/components/atlas-quick-nav";
+import { AtlasInheritors } from "@/components/atlas-inheritors";
 import { AtlasLineage, AtlasOverview } from "@/components/atlas-sections";
 import { CraftShowcase } from "@/components/craft-showcase";
 import { GalleryGrid } from "@/components/gallery-grid";
@@ -10,10 +11,10 @@ export const metadata = { title: "非遗图鉴" };
 /**
  * 非遗图鉴。
  *
- * 主站导航下方先是一条快速目录（工艺概述 / 地域流传 / 纹样图鉴），
+ * 主站导航下方先是一条快速目录（工艺概述 / 历史脉络 / 纹样图鉴），
  * 点哪一格就在本页内跳过去，下面三段依次对应：
  *   一 工艺概述 —— 左文右图的概述，后面接着工艺谱（十七种逐格可点）
- *   二 地域流传 —— 历史背景、文化溯源、发展历程四段
+ *   二 历史脉络 —— 以纵向时间轴呈现历史阶段、事件与意义
  *   三 纹样图鉴 —— 原样保留：SectionHeading 02 + GalleryGrid，一个字符没动
  *
  * 三段共用一块坯布底，段与段之间只压一道车缝线：读完「布怎么变成花的」，
@@ -51,8 +52,11 @@ export default function AtlasPage() {
         lede="十七种工艺，先看一块布怎么从扎结走到成品，再逐条点开：每一种都有自己的隐含义、技法要点、六道工序，以及工坊里真正能拧的三个参数。"
       />
 
-      {/* ── 二 · 地域流传（自带坯布底与车缝线）─────────────────────── */}
+      {/* ── 二 · 历史脉络（自带坯布底与车缝线）─────────────────────── */}
       <AtlasLineage />
+
+      {/* ── 非遗传承人 ───────────────────────────────────────────── */}
+      <AtlasInheritors />
 
       {/* ── 三 · 纹样图鉴（以下完全沿用原有代码与样式）────────────── */}
       <section
