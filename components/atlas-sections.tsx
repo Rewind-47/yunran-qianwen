@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * 待替换的实拍图位。
  *
  * 没传 src 时画一块靛蓝染布（同心晕圈 + 经纬布纹 + 四角裁切记号），
- * 拿到实拍素材后只要传 src，图片就会顶替占位底，其余版式不用动：
+ * 传入 src 后实拍图会顶替占位底，其余版式不用动：
  *
  *   <AtlasPlate src="/images/atlas/overview-01.webp" label="图 01 · 扎结中的坯布" />
  *
@@ -170,8 +170,9 @@ export function AtlasOverview() {
         <AtlasPlate
           className="lg:ml-auto lg:w-[86%]"
           ratio="aspect-[4/5] sm:aspect-[5/6] lg:aspect-square"
-          label="图 01 · 扎结中的坯布，周城院落"
-          hint="/images/atlas/overview-01.webp"
+          src="/images/process-intro.jpg"
+          alt="白族老人正在捆扎白布"
+          label="白族老人正在捆扎白布"
         />
       </div>
     </div>

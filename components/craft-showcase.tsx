@@ -87,15 +87,20 @@ interface CraftShowcaseProps {
   index?: string;
   cta?: boolean;
   lede?: string;
+  mode?: "all" | "sequence" | "techniques";
 }
 
 export function CraftShowcase({
   index = "02",
   cta = true,
   lede = "工艺不是几个好听的标签：每一种都对应一套自己的参数与纹样生成逻辑，而在这之前，先有四道谁也绕不过去的工序。",
+  mode = "all",
 }: CraftShowcaseProps) {
   return (
-    <section id="craft" className="relative overflow-hidden py-16 md:py-20">
+    <section
+      id={mode === "techniques" ? "technique-index" : "craft"}
+      className="relative overflow-hidden py-16 md:py-20"
+    >
       {/* 坯布底：未染之布，正是这一屏「从扎法到成品」的起点 */}
       <ClothBackdrop />
       {/* 靛蓝染晕：左上偏蓝、右下偏紫（板蓝根发酵后的紫调） */}
@@ -105,33 +110,35 @@ export function CraftShowcase({
       />
 
       <div className="relative mx-auto max-w-6xl px-5">
-        {/* 栏目头 */}
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="max-w-2xl">
-            <SectionTag index={index} eyebrow="Craft · From a Knot" className="mb-4" />
-            {/* 窄屏用 clamp 跟随视口：11 个字在 375px 下若固定 30px 会挤掉最后一个字 */}
-            <h2 className="title-brush text-[clamp(23px,6.4vw,30px)] leading-[1.3] tracking-[0.02em] text-dye-900 md:text-[38px] md:leading-[1.28]">
-              从一种扎法，到一件成品
-            </h2>
-            <RuleLine />
-            <p className="lede mt-4 max-w-xl text-[13.5px] text-dye-800/60">
-              {lede}
-            </p>
-          </div>
-          {cta && (
-            <div className="shrink-0 pb-1">
-              <Link
-                href="/studio/personal"
-                className="btn-dye inline-flex h-11 items-center rounded-full px-6 text-[13.5px] font-medium text-cloth-50"
-              >
-                去工坊试一件
-              </Link>
+        {mode !== "techniques" && (
+          <>
+            {/* 栏目头 */}
+            <div className="flex flex-wrap items-end justify-between gap-6">
+              <div className="max-w-2xl">
+                <SectionTag index={index} eyebrow="Craft · From a Knot" className="mb-4" />
+                {/* 窄屏用 clamp 跟随视口：11 个字在 375px 下若固定 30px 会挤掉最后一个字 */}
+                <h2 className="title-brush text-[clamp(23px,6.4vw,30px)] leading-[1.3] tracking-[0.02em] text-dye-900 md:text-[38px] md:leading-[1.28]">
+                  从一种扎法，到一件成品
+                </h2>
+                <RuleLine />
+                <p className="lede mt-4 max-w-xl text-[13.5px] text-dye-800/60">
+                  {lede}
+                </p>
+              </div>
+              {cta && (
+                <div className="shrink-0 pb-1">
+                  <Link
+                    href="/studio/personal"
+                    className="btn-dye inline-flex h-11 items-center rounded-full px-6 text-[13.5px] font-medium text-cloth-50"
+                  >
+                    去工坊试一件
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* ── A 染程带 ───────────────────────────────────────────── */}
-        <div className="mt-10">
+            {/* ── A 染程带 ───────────────────────────────────────────── */}
+            <div className="mt-10">
           <div className="flex items-baseline gap-3">
             <span className="eyebrow text-[8.5px] text-dye-700/45">Dyeing Sequence</span>
             <span className="h-px flex-1 bg-gradient-to-r from-dye-900/12 to-transparent" />
@@ -173,10 +180,23 @@ export function CraftShowcase({
               </li>
             ))}
           </ol>
-        </div>
+            </div>
+          </>
+        )}
 
-        {/* ── B 工艺谱 ───────────────────────────────────────────── */}
-        <div className="mt-12">
+        {mode === "techniques" && (
+          <div className="mb-8 max-w-3xl">
+            <h2 className="title-brush text-[clamp(23px,6.4vw,30px)] font-semibold leading-[1.3] tracking-[0.02em] text-dye-900 md:text-[38px] md:leading-[1.28]">
+              织物装饰三大技艺：扎染 · 印染 · 刺绣
+            </h2>
+            <RuleLine />
+          </div>
+        )}
+
+        {mode !== "sequence" && (
+          <>
+            {/* ── B 工艺谱 ───────────────────────────────────────────── */}
+            <div className={mode === "techniques" ? "" : "mt-12"}>
           <div className="flex items-baseline gap-3">
             <span className="eyebrow text-[8.5px] text-dye-700/45">Craft Index</span>
             <span className="h-px flex-1 bg-gradient-to-r from-dye-900/12 to-transparent" />
@@ -277,13 +297,15 @@ export function CraftShowcase({
               );
             })}
           </div>
-        </div>
+            </div>
 
-        {/* 图注：说明缩略图的来源，避免把示意图当成实物照片 */}
-        <p className="mt-8 flex items-start gap-2 border-l-2 border-dye-500/30 pl-4 text-[11px] leading-relaxed text-dye-800/45">
-          图与条目一一对应，均为该工艺的实物拍摄 ——
-          扎染一类拍的是拆线后的纹样，印染与刺绣拍的是工艺本身，不是通用示意图。
-        </p>
+            {/* 图注：说明缩略图的来源，避免把示意图当成实物照片 */}
+            <p className="mt-8 flex items-start gap-2 border-l-2 border-dye-500/30 pl-4 text-[11px] leading-relaxed text-dye-800/45">
+              图与条目一一对应，均为该工艺的实物拍摄 ——
+              扎染一类拍的是拆线后的纹样，印染与刺绣拍的是工艺本身，不是通用示意图。
+            </p>
+          </>
+        )}
       </div>
     </section>
   );
