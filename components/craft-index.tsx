@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { styleCategories } from "@/lib/data/styles";
+import type { GalleryCategoryId } from "@/lib/data/gallery-data";
 import { cn } from "@/lib/utils";
 import type { StyleCategory } from "@/lib/data/styles";
 
@@ -30,6 +31,17 @@ const cardFaces: Record<StyleCategory, { src: string; position: string }> = {
   bag: { src: "/images/products.webp", position: "74% 64%" },
   textile: { src: "/images/hero-courtyard.webp", position: "38% 44%" },
   home: { src: "/images/tie-dye-skirt.jpg", position: "62% 84%" },
+};
+
+const galleryCategoryIds: Record<StyleCategory, GalleryCategoryId> = {
+  dress: "dress",
+  top: "top",
+  skirt: "skirt",
+  hat: "hat",
+  head: "hairwear",
+  bag: "bag",
+  textile: "scarf",
+  home: "homeware",
 };
 
 export function CraftIndex() {
@@ -102,10 +114,7 @@ export function CraftIndex() {
             return (
               <Link
                 key={c.id}
-                href={{
-                  pathname: "/studio/personal/tie",
-                  query: { styleCategory: c.id },
-                }}
+                href={`/category/${galleryCategoryIds[c.id]}`}
                 className={`group relative block aspect-[3/4] w-full overflow-hidden rounded-[3px] ring-1 ring-inset ring-cloth-100/15 transition-all duration-700 ease-out hover:ring-cloth-100/45 lg:aspect-auto lg:h-full lg:flex-1 ${
                   index % 2 === 0
                     ? isVisible
