@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { HistoryEntry } from "@/lib/data/history";
 
@@ -38,23 +39,36 @@ export function HistoryTimeline({ items }: { items: HistoryEntry[] }) {
                 {item.era}
               </span>
 
-              <span className="relative pl-5 sm:pl-7">
-                <span
-                  aria-hidden
-                  className="absolute -left-1 top-[7px] h-[9px] w-[9px] rounded-full border border-dye-700/55 bg-cloth-50"
-                />
-                <span className="block text-[17px] leading-[1.5] text-dye-900 sm:text-[19px]">
-                  {item.title}
-                </span>
-                <span className="mt-2 block max-w-3xl whitespace-pre-line text-[13px] leading-[1.95] text-dye-800/70">
-                  {item.summary}
-                </span>
-                <span className="mt-3 block text-[12px] text-dye-700/70">
-                  查看详细资料
-                  <span aria-hidden className="ml-2">
-                    →
+              <span className="flex min-w-0 items-stretch gap-4">
+                <span className="relative min-w-0 flex-1 pl-5 sm:pl-7">
+                  <span
+                    aria-hidden
+                    className="absolute -left-1 top-[7px] h-[9px] w-[9px] rounded-full border border-dye-700/55 bg-cloth-50"
+                  />
+                  <span className="block text-[17px] leading-[1.5] text-dye-900 sm:text-[19px]">
+                    {item.title}
+                  </span>
+                  <span className="mt-2 block max-w-3xl whitespace-pre-line text-[13px] leading-[1.95] text-dye-800/70">
+                    {item.summary}
+                  </span>
+                  <span className="mt-3 block text-[12px] text-dye-700/70">
+                    查看详细资料
+                    <span aria-hidden className="ml-2">
+                      →
+                    </span>
                   </span>
                 </span>
+                {item.image && (
+                  <span className="relative min-h-28 w-[34%] min-w-[92px] max-w-[200px] shrink-0 self-stretch overflow-hidden rounded-lg">
+                    <Image
+                      src={item.image}
+                      alt={`${item.era}：${item.title}`}
+                      fill
+                      sizes="(max-width: 640px) 34vw, 200px"
+                      className="object-cover"
+                    />
+                  </span>
+                )}
               </span>
             </button>
           </li>

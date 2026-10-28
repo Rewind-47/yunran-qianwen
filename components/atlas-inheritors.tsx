@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { SectionHeading } from "@/components/section-heading";
 import { ClothBackdrop } from "@/components/section-chrome";
 import { inheritorsData } from "@/lib/data/inheritors";
@@ -31,26 +32,37 @@ export function AtlasInheritors() {
           {inheritorsData.map((inheritor) => (
             <li
               key={inheritor.name}
-              className="card-lift flex min-h-full flex-col rounded-card border border-dye-900/10 bg-white/75 p-6 shadow-[0_8px_24px_-16px_rgba(16,31,47,0.38)] backdrop-blur-[2px] hover:shadow-[0_24px_42px_-20px_rgba(16,31,47,0.38)]"
+              className="card-lift flex min-h-[240px] min-w-0 flex-row overflow-hidden rounded-card border border-dye-900/10 bg-white/75 shadow-[0_8px_24px_-16px_rgba(16,31,47,0.38)] backdrop-blur-[2px] hover:shadow-[0_24px_42px_-20px_rgba(16,31,47,0.38)]"
             >
-              <p className="eyebrow text-[9px] text-dye-600/65">
-                {inheritor.title}
-              </p>
-              <h3 className="mt-3 text-[21px] leading-[1.4] text-dye-900">
-                {inheritor.name}
-              </h3>
-              <p className="mt-4 flex-1 text-[12.5px] leading-[1.95] text-dye-800/65">
-                {inheritor.desc}
-              </p>
-              <a
-                href={inheritor.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex w-fit items-center gap-2 text-[12px] text-dye-700 transition-colors hover:text-dye-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-dye-600"
-              >
-                了解详情
-                <span aria-hidden>↗</span>
-              </a>
+              <div className="flex min-w-0 flex-[3] flex-col p-4">
+                <p className="eyebrow text-[9px] text-dye-600/65">
+                  {inheritor.title}
+                </p>
+                <h3 className="mt-2 text-[19px] leading-[1.4] text-dye-900">
+                  {inheritor.name}
+                </h3>
+                <p className="mt-3 flex-1 text-[12px] leading-[1.85] text-dye-800/65">
+                  {inheritor.desc}
+                </p>
+                <a
+                  href={inheritor.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex w-fit items-center gap-2 text-[12px] text-dye-700 transition-colors hover:text-dye-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-dye-600"
+                >
+                  了解详情
+                  <span aria-hidden>↗</span>
+                </a>
+              </div>
+              <div className="relative min-h-[240px] flex-[2] self-stretch">
+                <Image
+                  src={inheritor.image}
+                  alt={inheritor.name}
+                  fill
+                  sizes="(max-width: 640px) 40vw, (max-width: 1280px) 20vw, 10vw"
+                  className="object-cover"
+                />
+              </div>
             </li>
           ))}
         </ul>

@@ -4,6 +4,7 @@ export type HistoryEntry = {
   title: string;
   summary: string;
   detail: string;
+  image?: string;
 };
 
 export const historyData: HistoryEntry[] = [
@@ -20,6 +21,7 @@ export const historyData: HistoryEntry[] = [
     era: "唐·贞元十六年（800年）",
     title: "南诏扎染随使团入长安，载入正史",
     summary: "南诏王遣使团献《南诏奉圣乐》，扎染首次进入中原官方记载。",
+    image: "/images/history/tang.jpg",
     detail:
       "事件：南诏王异牟寻派遣大型歌舞使团赴长安，向唐德宗进献《南诏奉圣乐》。舞伎所穿衣裙为白族绞缬扎染面料。史料：《新唐书·南蛮传》记载：“裙襦鸟兽草木，文以八彩杂革”。意义：这是大理扎染第一次进入中原王朝官方记载，证明当时白族绞缬技艺已经成熟。",
   },
@@ -44,6 +46,7 @@ export const historyData: HistoryEntry[] = [
     era: "明清（1368–1912年）",
     title: "周城成型，染业行会兴起",
     summary: "周城形成专业染织村落，扎染深度嵌入白族人生礼俗。",
+    image: "/images/history/mingqing.jpg",
     detail:
       "明代：喜洲周城逐步形成专业染织村落，诞生染布行会。清代中后期：周城形成家家有染缸、户户会扎花的格局。经典传世纹样（蝴蝶、梅花、狗牙纹等）基本定型，寓意与白族本主信仰绑定。流通：依托茶马古道，扎染布匹销往丽江、香格里拉、缅甸等区域。",
   },
@@ -68,6 +71,7 @@ export const historyData: HistoryEntry[] = [
     era: "1998年",
     title: "璞真染坊复建，开启抢救性记录",
     summary: "传承人复建染坊，搜集临摹传统图谱，记录失传技法。",
+    image: "/images/history/1998.jpg",
     detail:
       "事件：白族传承人段树坤、段银开夫妇，在周城重建璞真扎染坊，走访村内老艺人，搜集、临摹、抢救快要消失的传统扎染纹样图谱。意义：民间自发抢救，为后续非遗保护储备了一手纹样资料。",
   },
@@ -76,6 +80,7 @@ export const historyData: HistoryEntry[] = [
     era: "2006年5月20日",
     title: "【里程碑】列入国家级非物质文化遗产",
     summary: "白族扎染技艺列入第一批国家级非遗名录，编号Ⅷ-26。",
+    image: "/images/history/2006.jpg",
     detail:
       "申报保护单位：大理市非物质文化遗产保护管理所。意义：从国家层面确立保护身份，政府开始扶持传承人、开展普查、记录影像资料，扎染从“农村副业”变成国家级非遗项目。",
   },
@@ -84,6 +89,7 @@ export const historyData: HistoryEntry[] = [
     era: "2015年",
     title: "大理璞真白族扎染博物馆开放",
     summary: "国内首个扎染专题博物馆落地周城，成为大众了解扎染的线下窗口。",
+    image: "/images/history/2015.jpg",
     detail:
       "事件：馆藏上千份老扎染布、百年纹样底样、古染缸等；开设传习空间，面向游客、学生开放体验教学。意义：扎染有了固定的展示、研学、传承阵地。",
   },
