@@ -13,6 +13,7 @@ export interface UserState {
   isLoggedIn: boolean;
   isLoginModalOpen: boolean;
   login: (username: string) => void;
+  updateUsername: (username: string) => void;
   logout: () => void;
   openLoginModal: () => void;
   closeLoginModal: () => void;
@@ -29,6 +30,10 @@ export const useUserStore = create<UserState>()(
           userInfo: { username, avatar: null },
           isLoggedIn: true,
         }),
+      updateUsername: (username) =>
+        set((state) => ({
+          userInfo: { username, avatar: state.userInfo?.avatar ?? null },
+        })),
       logout: () =>
         set({
           userInfo: null,
