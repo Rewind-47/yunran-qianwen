@@ -36,12 +36,12 @@ export default function PersonalFamilyPage({
       <div className="space-y-12">
         <section id="inpaint" aria-labelledby="inpaint-heading">
           <div className="mb-5">
-            <p className="eyebrow text-[9px] text-dye-700/55">LOCAL REPAINT</p>
+            <p className="eyebrow text-[9px] text-dye-700/55">FREEHAND DYEING</p>
             <h2
               id="inpaint-heading"
               className="mt-1.5 font-song text-[25px] font-semibold text-dye-900"
             >
-              局部重绘
+              随心点染
             </h2>
             <p className="mt-1.5 text-[12px] text-dye-800/55">
               在画纸上绘制或重绘纹样，再把设计应用到下方的实物坯布。

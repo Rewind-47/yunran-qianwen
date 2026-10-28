@@ -431,7 +431,7 @@ export function MyPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="title-brush text-[22px] text-dye-900">我的手绘图案</h2>
           <p className="text-[11.5px] text-dye-800/45">
-            在局部重绘的白纸上画的稿子，可以随时贴到工坊的坯布上
+            在随心点染的白纸上画的稿子，可以随时贴到工坊的坯布上
           </p>
         </div>
 
@@ -441,7 +441,7 @@ export function MyPage() {
           <div className="mt-5 grid place-items-center rounded-card border border-dashed border-dye-900/15 bg-white/40 px-6 py-12 text-center">
             <p className="text-[13px] text-dye-800/60">还没有手绘图稿</p>
             <p className="mt-2 max-w-sm text-[11.5px] leading-relaxed text-dye-800/40">
-              去局部重绘选一门扎染手艺，在白纸上勾几笔——画完点「保存到我的」，
+              去随心点染选一门扎染手艺，在白纸上勾几笔——画完点「保存到我的」，
               画稿就会出现在这里，随时可以应用到实物。
             </p>
             <Link

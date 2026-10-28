@@ -7,7 +7,7 @@ export function StudioFrame({ children }: { children: React.ReactNode }) {
           创作工坊
         </h1>
         <p className="lede mt-2.5 max-w-xl text-[13px] text-dye-800/60">
-          从局部重绘到款式、工艺与配色设计，在同一画面中完成你的创作。
+          从随心点染到款式、工艺与配色设计，在同一画面中完成你的创作。
         </p>
       </div>
       <div className="mt-8">{children}</div>

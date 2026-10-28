@@ -53,8 +53,11 @@ interface Layer {
   id: string;
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
+  textureCanvas: HTMLCanvasElement;
+  textureCtx: CanvasRenderingContext2D;
   texture: THREE.CanvasTexture;
   strokes: number;
+  sketch: HTMLImageElement | null;
   /** 上一笔的位置（画布坐标），插值连线用 */
   last: { x: number; y: number } | null;
 }
@@ -71,6 +74,7 @@ export class ClothPaint {
   private layers = new Map<string, Layer>();
   private undoStack: { layerId: string; data: ImageData }[] = [];
   private pendingSketch: HTMLImageElement | null = null;
+  private sketchRevision = 0;
   private seq = 0;
 
   get strokes(): number {
@@ -92,7 +96,14 @@ export class ClothPaint {
     ctx.fillStyle = CLOTH;
     ctx.fillRect(0, 0, SIZE, SIZE);
 
-    const texture = new THREE.CanvasTexture(canvas);
+    const textureCanvas = document.createElement("canvas");
+    textureCanvas.width = textureCanvas.height = SIZE;
+    const textureCtx = textureCanvas.getContext("2d");
+    if (!textureCtx) throw new Error("2D texture canvas unavailable");
+    textureCtx.fillStyle = CLOTH;
+    textureCtx.fillRect(0, 0, SIZE, SIZE);
+
+    const texture = new THREE.CanvasTexture(textureCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
@@ -100,17 +111,38 @@ export class ClothPaint {
     texture.needsUpdate = true;
 
     const id = `layer-${(this.seq += 1)}`;
-    const layer: Layer = { id, canvas, ctx, texture, strokes: 0, last: null };
+    const layer: Layer = {
+      id,
+      canvas,
+      ctx,
+      textureCanvas,
+      textureCtx,
+      texture,
+      strokes: 0,
+      sketch: null,
+      last: null,
+    };
     // 之前铺过手绘稿的话，新衣片也要补上（局部重绘 → 工坊 直达时衣片后到）
     if (this.pendingSketch) {
-      ctx.save();
-      ctx.globalCompositeOperation = "multiply";
-      ctx.drawImage(this.pendingSketch, 0, 0, SIZE, SIZE);
-      ctx.restore();
+      layer.sketch = this.pendingSketch;
       layer.strokes += 1;
     }
     this.layers.set(id, layer);
+    this.renderLayer(layer);
     return id;
+  }
+
+  private renderLayer(layer: Layer) {
+    const { textureCtx, textureCanvas, canvas, sketch } = layer;
+    textureCtx.clearRect(0, 0, SIZE, SIZE);
+    textureCtx.drawImage(canvas, 0, 0);
+    if (sketch) {
+      textureCtx.save();
+      textureCtx.globalCompositeOperation = "multiply";
+      textureCtx.drawImage(sketch, 0, 0, SIZE, SIZE);
+      textureCtx.restore();
+    }
+    layer.texture.needsUpdate = true;
   }
 
   layerTexture(id: string): THREE.CanvasTexture | null {
@@ -151,7 +183,7 @@ export class ClothPaint {
     if (Math.abs(dx) > w * 0.45) {
       this.dab(l, x, y, r, brush, 0);
       l.last = { x, y };
-      l.texture.needsUpdate = true;
+      this.renderLayer(l);
       return;
     }
 
@@ -162,7 +194,7 @@ export class ClothPaint {
       this.dab(l, last.x + (dx * i) / n, last.y + (dy * i) / n, r, brush, angle);
     }
     l.last = { x, y };
-    l.texture.needsUpdate = true;
+    this.renderLayer(l);
   }
 
   private dab(
@@ -239,32 +271,38 @@ export class ClothPaint {
     if (!l) return false;
     l.ctx.putImageData(entry.data, 0, 0);
     l.strokes = Math.max(0, l.strokes - 1);
-    l.texture.needsUpdate = true;
+    this.renderLayer(l);
     l.last = null;
     return true;
   }
 
   /** 整件洗净 */
   clear() {
+    this.sketchRevision += 1;
+    this.pendingSketch = null;
     this.layers.forEach((l) => {
       this.undoStack.push({ layerId: l.id, data: l.ctx.getImageData(0, 0, SIZE, SIZE) });
       l.ctx.fillStyle = CLOTH;
       l.ctx.fillRect(0, 0, SIZE, SIZE);
       l.strokes = 0;
+      l.sketch = null;
       l.last = null;
-      l.texture.needsUpdate = true;
+      this.renderLayer(l);
     });
     if (this.undoStack.length > MAX_UNDO) this.undoStack.splice(0, this.undoStack.length - MAX_UNDO);
   }
 
   /** 切换款式时清空所有衣片与撤销记录，避免旧款的笔迹污染新款。 */
   reset() {
+    this.sketchRevision += 1;
+    this.pendingSketch = null;
     this.layers.forEach((l) => {
       l.ctx.fillStyle = CLOTH;
       l.ctx.fillRect(0, 0, SIZE, SIZE);
       l.strokes = 0;
+      l.sketch = null;
       l.last = null;
-      l.texture.needsUpdate = true;
+      this.renderLayer(l);
     });
     this.undoStack = [];
     this.pendingSketch = null;
@@ -272,15 +310,28 @@ export class ClothPaint {
 
   /** 局部重绘带来的手绘稿：铺到每一片坯布上（含之后才创建的衣片），之后还能继续涂 */
   async applySketch(dataUrl: string) {
+    const revision = this.sketchRevision;
     const image = await loadImage(dataUrl);
+    if (revision !== this.sketchRevision) return;
     this.pendingSketch = image;
     this.layers.forEach((l) => {
-      l.ctx.save();
-      l.ctx.globalCompositeOperation = "multiply";
-      l.ctx.drawImage(image, 0, 0, SIZE, SIZE);
-      l.ctx.restore();
+      if (l.sketch) l.strokes = Math.max(0, l.strokes - 1);
+      l.sketch = image;
       l.strokes += 1;
-      l.texture.needsUpdate = true;
+      this.renderLayer(l);
+    });
+  }
+
+  /** 移除从局部重绘应用的图案，同时保留用户在 3D 布料上的其他笔迹。 */
+  removeSketch() {
+    this.sketchRevision += 1;
+    this.pendingSketch = null;
+    this.layers.forEach((l) => {
+      if (!l.sketch) return;
+      l.sketch = null;
+      l.strokes = Math.max(0, l.strokes - 1);
+      l.last = null;
+      this.renderLayer(l);
     });
   }
 
@@ -294,7 +345,9 @@ export class ClothPaint {
     ctx.fillStyle = CLOTH;
     ctx.fillRect(0, 0, size, size);
     ctx.globalCompositeOperation = "multiply";
-    this.layers.forEach((l) => ctx.drawImage(l.canvas, 0, 0, size, size));
+    this.layers.forEach((l) =>
+      ctx.drawImage(l.textureCanvas, 0, 0, size, size),
+    );
     return out.toDataURL("image/jpeg", 0.62);
   }
 }

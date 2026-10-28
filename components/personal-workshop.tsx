@@ -140,7 +140,7 @@ export function PersonalWorkshop({
   const stored = techniqueMap[techniqueId] ?? techniqueMap.spiral;
   // 工艺大类由路由决定（/studio/personal/tie|print|embroider）：
   // 从别的工艺页切过来时，先落到这一类的第一种工艺，再把状态写回 store，
-  // 保证 3D、局部重绘读到的始终是当前页面的这一类。
+  // 保证 3D、随心点染读到的始终是当前页面的这一类。
   const inFamily = !family || stored.category === family;
   const base = inFamily ? stored : (techniquesByCategory(family!)[0] ?? stored);
   const isEmbroidery = base.category === "embroider";
@@ -212,7 +212,7 @@ export function PersonalWorkshop({
     setBrushTool(brushForCategory(base.category));
   }, [base.category]);
 
-  // 从局部重绘带过来的手绘稿：铺到坯布上（之后还能继续涂）
+  // 从随心点染带过来的手绘稿：铺到坯布上（之后还能继续涂）
   const sketchRef = useRef<string | null>(null);
   useEffect(() => {
     if (!cloth || !customSketch) return;
@@ -224,6 +224,15 @@ export function PersonalWorkshop({
       flashTip(`已把「${customSketch.name}」贴到坯布上`);
     });
   }, [cloth, customSketch, flashTip]);
+
+  function removeAppliedSketch() {
+    cloth?.removeSketch();
+    clearCustomSketch();
+    sketchRef.current = null;
+    setPaintStrokes(cloth?.strokes ?? 0);
+    setPaintOn(true);
+    flashTip("已移除手绘图案");
+  }
 
   const brush: BrushSettings = useMemo(
     () => ({ color: dyeColor, size: brushSize, tool: brushTool, opacity: brushOpacity }),
@@ -717,7 +726,7 @@ export function PersonalWorkshop({
       <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[382px_minmax(0,1fr)] lg:gap-5">
       {/* ---------------- 左：定制流程（可滚动） ---------------- */}
       <div className="order-2 space-y-4 lg:order-1 lg:h-full lg:overflow-y-auto lg:pr-2 lg:[scrollbar-width:thin] lg:[scrollbar-color:rgba(16,31,47,0.18)_transparent]">
-        {/* 从局部重绘带来的手绘图案：贴图里已经叠进这张画稿 */}
+        {/* 从随心点染带来的手绘图案：贴图里已经叠进这张画稿 */}
         {customSketch && (
           <section className="flex items-center gap-3 rounded-card border border-madder-200 bg-madder-50/60 px-4 py-3">
             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-dye-900/10 bg-white">
@@ -726,7 +735,7 @@ export function PersonalWorkshop({
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] text-dye-900/85">
-                手绘图案「{customSketch.name}」已贴上这件坯布
+                手绘图案已应用到这件坯布
               </p>
               <p className="mt-0.5 text-[10.5px] leading-relaxed text-dye-800/50">
                 已铺到 3D 坯布上，可以继续拿画笔在上面加工。
@@ -734,7 +743,7 @@ export function PersonalWorkshop({
             </div>
             <button
               type="button"
-              onClick={clearCustomSketch}
+              onClick={removeAppliedSketch}
               className="shrink-0 rounded-full border border-madder-500/30 px-3 py-1 text-[11px] text-madder-500 transition-colors hover:bg-madder-500 hover:text-cloth-50"
             >
               移除图案

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PatternSwatch } from "@/components/pattern-swatch";
-import { AgentTrace } from "@/components/agent-trace";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { techniques, techniqueMap } from "@/lib/data/techniques";
@@ -12,9 +10,16 @@ import { drawPattern } from "@/lib/render/pattern-canvas";
 import { saveSketch } from "@/lib/db/sketches";
 import { useStudioStore } from "@/store/studio";
 import { cn } from "@/lib/utils";
-import type { AgentStep } from "@/lib/types";
 
 const SIZE = 640;
+const MAX_HISTORY = 30;
+const dyeColors = [
+  { name: "深靛蓝（板蓝根原色）", value: "#1A3A5C" },
+  { name: "经典扎染蓝", value: "#2B5B84" },
+  { name: "浅水蓝", value: "#4A7B9D" },
+  { name: "晕染淡蓝", value: "#9BB8D3" },
+  { name: "纯白（留白/橡皮）", value: "#FFFFFF" },
+] as const;
 
 /** 画具：勾线（细实线）/ 晕染（大而软）/ 橡皮 */
 type Tool = "line" | "wash" | "eraser";
@@ -26,12 +31,12 @@ const tools: { id: Tool; label: string; hint: string }[] = [
 ];
 
 /**
- * 局部重绘。
+ * 随心点染。
  *
  * 左侧是一张白纸：选好扎染手艺后，直接在纸上勾画图案——
  * 笔画用的是当前手艺的染料色，画的就是「染上去」的样子。
  * 画稿本身就是重绘管线要的 mask（黑底白区约定只看 alpha），
- * 所以手绘、AI 局部重绘、保存到「我的」、应用到实物共用同一份笔迹：
+ * 所以手绘、AI 随心点染、保存到「我的」、应用到实物共用同一份笔迹：
  *   白纸 + 笔迹 → 通义万相 description_edit_with_mask → 只把遮罩内像素合成回白纸
  *
  * 关键约束：生成模型一定会重画整张图，靠 prompt 说「别改其他区域」是控制不住的。
@@ -43,12 +48,13 @@ export function InpaintStudio() {
   const baseRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const resultRef = useRef<HTMLCanvasElement>(null);
+  const historyRef = useRef<ImageData[]>([]);
+  const historyIndexRef = useRef(-1);
   const router = useRouter();
 
   const {
     techniqueId,
     params,
-    setTechnique,
     baseColor,
     dyeColor,
     accentColor,
@@ -56,12 +62,14 @@ export function InpaintStudio() {
   } = useStudioStore();
   const [tool, setTool] = useState<Tool>("line");
   const [brush, setBrush] = useState(26);
+  const [currentColor, setCurrentColor] = useState("#2B5B84");
+  const [mirrorEnabled, setMirrorEnabled] = useState(false);
   const [compare, setCompare] = useState(50);
   const [hasMask, setHasMask] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
   const [hasResult, setHasResult] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [instruction, setInstruction] = useState("");
-  const [steps, setSteps] = useState<AgentStep[]>([]);
+  const [generationNotice, setGenerationNotice] = useState("");
   const [engine, setEngine] = useState<{ mode: "model" | "local"; label: string } | null>(null);
   const [verify, setVerify] = useState<{ changed: number; sampled: number } | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -88,13 +96,6 @@ export function InpaintStudio() {
     [],
   );
 
-  const pushStep = useCallback((step: AgentStep) => {
-    setSteps((prev) => {
-      const next = prev.filter((s) => s.id !== step.id);
-      return [...next, step];
-    });
-  }, []);
-
   /** 底图：一张纯白画纸，纹样由用户亲手画上去 */
   const drawBase = useCallback(() => {
     const canvas = baseRef.current;
@@ -105,9 +106,32 @@ export function InpaintStudio() {
     ctx.fillRect(0, 0, SIZE, SIZE);
   }, []);
 
+  function resetHistory() {
+    const ctx = maskRef.current?.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    historyRef.current = [ctx.getImageData(0, 0, SIZE, SIZE)];
+    historyIndexRef.current = 0;
+    setCanUndo(false);
+  }
+
+  function recordHistory() {
+    const ctx = maskRef.current?.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    const snapshot = ctx.getImageData(0, 0, SIZE, SIZE);
+    const next = historyRef.current.slice(0, historyIndexRef.current + 1);
+    next.push(snapshot);
+    if (next.length > MAX_HISTORY) next.shift();
+    historyRef.current = next;
+    historyIndexRef.current = next.length - 1;
+    setCanUndo(historyIndexRef.current > 0);
+    setHasMask(snapshot.data.some((value, index) => index % 4 === 3 && value > 0));
+  }
+
   useEffect(() => {
     drawBase();
     clearMask();
+    resetHistory();
     setHasResult(false);
     setVerify(null);
   }, [drawBase]);
@@ -121,14 +145,30 @@ export function InpaintStudio() {
 
   function resetAll() {
     clearMask();
+    resetHistory();
     const r = resultRef.current;
     const ctx = r?.getContext("2d");
     if (r && ctx) ctx.clearRect(0, 0, SIZE, SIZE);
     setHasResult(false);
-    setSteps([]);
     setEngine(null);
     setVerify(null);
     setCompare(50);
+    setGenerationNotice("");
+  }
+
+  function undo() {
+    if (historyIndexRef.current <= 0) return;
+    const ctx = maskRef.current?.getContext("2d");
+    if (!ctx) return;
+
+    historyIndexRef.current -= 1;
+    const previous = historyRef.current[historyIndexRef.current];
+    ctx.putImageData(previous, 0, 0);
+    setHasMask(previous.data.some((value, index) => index % 4 === 3 && value > 0));
+    setCanUndo(historyIndexRef.current > 0);
+    setHasResult(false);
+    setEngine(null);
+    setVerify(null);
   }
 
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -151,8 +191,6 @@ export function InpaintStudio() {
   function strokeSegment(from: { x: number; y: number }, to: { x: number; y: number }) {
     const ctx = maskRef.current?.getContext("2d");
     if (!ctx) return;
-    const dye = technique.palette[1];
-
     if (tool === "eraser") {
       ctx.globalCompositeOperation = "destination-out";
       ctx.globalAlpha = 1;
@@ -170,7 +208,7 @@ export function InpaintStudio() {
 
     if (tool === "line") {
       ctx.globalAlpha = 0.88;
-      ctx.strokeStyle = dye;
+      ctx.strokeStyle = currentColor;
       ctx.lineWidth = brush;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -190,7 +228,7 @@ export function InpaintStudio() {
       const x = from.x + ((to.x - from.x) * i) / steps;
       const y = from.y + ((to.y - from.y) * i) / steps;
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, dye);
+      g.addColorStop(0, currentColor);
       g.addColorStop(1, "rgba(0,0,0,0)");
       ctx.globalAlpha = 0.16;
       ctx.fillStyle = g;
@@ -202,68 +240,36 @@ export function InpaintStudio() {
   }
 
   function paintDot(p: { x: number; y: number }) {
-    strokeSegment(p, { x: p.x + 0.01, y: p.y + 0.01 });
+    paintSegment(p, { x: p.x + 0.01, y: p.y + 0.01 });
     setHasMask(true);
     if (hasResult) setHasResult(false);
+  }
+
+  function paintSegment(from: { x: number; y: number }, to: { x: number; y: number }) {
+    strokeSegment(from, to);
+    if (!mirrorEnabled) return;
+
+    const width = maskRef.current?.width ?? SIZE;
+    strokeSegment(
+      { x: width - from.x, y: from.y },
+      { x: width - to.x, y: to.y },
+    );
   }
 
   function move(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!painting.current) return;
     const p = pos(e);
     const from = lastPoint.current ?? p;
-    strokeSegment(from, p);
+    paintSegment(from, p);
     lastPoint.current = p;
     setHasMask(true);
     if (hasResult) setHasResult(false);
   }
 
   function end() {
+    if (painting.current) recordHistory();
     painting.current = false;
     lastPoint.current = null;
-  }
-
-  /** 自然语言 → 区域遮罩（规则 grounding：方位词 + 中心区域兜底） */
-  function maskFromInstruction() {
-    const text = instruction.trim();
-    if (!text) return;
-    const ctx = maskRef.current?.getContext("2d");
-    if (!ctx) return;
-
-    const half = SIZE / 2;
-    let x = 0;
-    let y = 0;
-    let w = SIZE;
-    let h = SIZE;
-
-    const hasLeft = /左/.test(text);
-    const hasRight = /右/.test(text);
-    const hasTop = /上/.test(text);
-    const hasBottom = /下/.test(text);
-
-    if (hasLeft || hasRight) {
-      x = hasLeft ? 0 : half;
-      w = half;
-    }
-    if (hasTop || hasBottom) {
-      y = hasTop ? 0 : half;
-      h = half;
-    }
-    if (!hasLeft && !hasRight && !hasTop && !hasBottom) {
-      x = SIZE * 0.25;
-      y = SIZE * 0.25;
-      w = SIZE * 0.5;
-      h = SIZE * 0.5;
-    }
-
-    ctx.clearRect(0, 0, SIZE, SIZE);
-    ctx.fillStyle = technique.palette[1];
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 24);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    setHasMask(true);
-    setHasResult(false);
   }
 
   /** 导出黑底白区的 mask（万相约定：白色 = 重绘，黑色 = 保留） */
@@ -385,41 +391,11 @@ export function InpaintStudio() {
   async function generate() {
     if (!hasMask || generating) return;
     setGenerating(true);
-    setSteps([]);
+    setGenerationNotice("");
     setEngine(null);
     setVerify(null);
 
-    const regionHint = instruction.trim() || "用户手绘遮罩覆盖的区域";
-    const prompt = buildInpaintPrompt(technique, params, regionHint, instruction || undefined);
-
-    pushStep({
-      id: "i1",
-      kind: "plan",
-      title: "解析重绘目标",
-      detail: instruction ? `自然语言指定：${instruction}` : "手绘遮罩作为目标区域",
-      status: "done",
-      durationMs: 6,
-    });
-    pushStep({
-      id: "i2",
-      kind: "plan",
-      title: "构造重绘提示词（带工艺约束）",
-      detail: prompt,
-      status: "done",
-      durationMs: 3,
-    });
-
-    const toolStepId = "i3";
-    pushStep({
-      id: toolStepId,
-      kind: "tool",
-      title: "局部重绘",
-      tool: "inpaint_region",
-      detail: "提交底图与遮罩，等待图像模型返回",
-      status: "running",
-    });
-
-    const started = Date.now();
+    const regionHint = "用户手绘遮罩覆盖的区域";
     let mode: "model" | "local" = "local";
     let engineLabel = "本地合成";
     let reason = "";
@@ -435,7 +411,7 @@ export function InpaintStudio() {
         body: JSON.stringify({
           baseImage,
           maskImage,
-          instruction,
+          instruction: "",
           techniqueId,
           params,
           regionHint,
@@ -464,32 +440,15 @@ export function InpaintStudio() {
       compositeLocal();
     }
 
-    const durationMs = Date.now() - started;
     const check = verifyOutsideMask();
-
-    pushStep({
-      id: toolStepId,
-      kind: "tool",
-      title: "局部重绘",
-      tool: "inpaint_region",
-      detail:
-        mode === "model"
-          ? `${engineLabel} 返回结果，已按遮罩合成`
-          : `未接入图像模型（${reason.slice(0, 40)}），使用本地程序化渲染，链路保持完整`,
-      status: mode === "model" ? "done" : "error",
-      durationMs,
-    });
-    pushStep({
-      id: "i4",
-      kind: "reflect",
-      title: check.changed === 0 ? "遮罩外像素校验通过" : `检测到 ${check.changed} 个越界像素`,
-      detail: `抽样 ${check.sampled.toLocaleString()} 个遮罩外像素，改动 ${check.changed} 个（容差 RGB 合计 ≤ 2）。`,
-      status: check.changed === 0 ? "done" : "error",
-      durationMs: 12,
-    });
 
     setEngine({ mode, label: engineLabel });
     setVerify(check);
+    setGenerationNotice(
+      mode === "model"
+        ? "AI 随心点染已完成。"
+        : `已使用本地纹样合成${reason ? `（${reason}）` : ""}。`,
+    );
     setGenerating(false);
     setHasResult(true);
     setCompare(50);
@@ -500,7 +459,7 @@ export function InpaintStudio() {
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = `云染千纹-${technique.name}-局部重绘.png`;
+    a.download = `云染千纹-${technique.name}-随心点染.png`;
     a.click();
   }
 
@@ -531,11 +490,10 @@ export function InpaintStudio() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      {/* 画布区 */}
-      <div>
-        <div className="rounded-card border border-dye-900/10 bg-white/60 p-4">
-          <div className="relative mx-auto w-full max-w-[560px] overflow-hidden rounded-xl border border-dye-900/10 bg-white shadow-[0_24px_60px_-46px_rgba(16,31,47,0.55)]">
+    <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <main className="min-w-0 flex-1">
+        <div className="rounded-card border border-dye-900/10 bg-white/60 p-3 sm:p-5">
+          <div className="relative mx-auto w-full max-w-[min(72vh,720px)] overflow-hidden rounded-xl border border-dye-900/10 bg-white shadow-[0_24px_60px_-46px_rgba(16,31,47,0.55)]">
             <div className="relative aspect-square w-full">
               <canvas ref={baseRef} width={SIZE} height={SIZE} className="absolute inset-0 h-full w-full" />
 
@@ -558,7 +516,7 @@ export function InpaintStudio() {
                 onPointerDown={startPaint}
                 onPointerMove={move}
                 onPointerUp={end}
-                onPointerLeave={end}
+                onPointerCancel={end}
                 className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
                 style={{ opacity: hasResult ? 0 : 1 }}
               />
@@ -577,7 +535,7 @@ export function InpaintStudio() {
               {!hasMask && !hasResult && (
                 <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
                   <span className="rounded-full bg-dye-950/55 px-3 py-1.5 text-[11.5px] text-cloth-50 backdrop-blur-sm">
-                    选好扎染手艺，在白纸上勾画图案
+                    在画布上绘制需要重绘的区域
                   </span>
                 </div>
               )}
@@ -590,98 +548,22 @@ export function InpaintStudio() {
             </div>
           </div>
 
-          {/* 画具 */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-            <div className="flex items-center gap-1.5">
-              {tools.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  title={t.hint}
-                  onClick={() => setTool(t.id)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-[12px] transition-colors",
-                    tool === t.id
-                      ? "border-dye-700 bg-dye-700 text-cloth-50"
-                      : "border-dye-900/12 text-dye-800/60 hover:border-dye-700/35 hover:text-dye-900",
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[11.5px] text-dye-800/50">笔刷</span>
-              <input
-                type="range"
-                min={6}
-                max={120}
-                step={2}
-                value={brush}
-                onChange={(e) => setBrush(Number(e.target.value))}
-                className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-dye-900/10 accent-dye-700"
-              />
-              <span className="font-mono text-[11px] text-dye-700">{brush}px</span>
-            </div>
-
-            <span
-              className="h-5 w-5 rounded-full border border-dye-900/15"
-              style={{ backgroundColor: technique.palette[1] }}
-              title="当前染料色，跟工坊配色联动"
-            />
-
-            <div className="ml-auto flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={clearMask}>
-                清空画纸
-              </Button>
-              <Button variant="ghost" size="sm" onClick={resetAll}>
-                重置
-              </Button>
-              {hasResult && (
-                <Button variant="outline" size="sm" onClick={download}>
-                  下载
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={saveToLibrary}
-                disabled={!hasMask}
-                title="把这张画稿存进「我的」页面"
-              >
-                {savedFlash ? "已保存 ✓" : "保存到我的"}
-              </Button>
-              <Button
-                variant="madder"
-                size="sm"
-                onClick={applyToGarment}
-                disabled={!hasMask}
-                title="把手绘图案贴到个性工坊的坯布上"
-              >
-                应用到实物 →
-              </Button>
-              <Button size="sm" onClick={generate} disabled={!hasMask || generating}>
-                {generating ? "重绘中…" : "重绘此区域"}
-              </Button>
-            </div>
-          </div>
-
-          <p className="mt-2 text-[11px] leading-relaxed text-dye-800/40">
-            画纸上的笔迹就是重绘区域：点「重绘此区域」让 AI
-            按当前手艺把笔迹渲染成纹样；点「应用到实物」把原稿直接贴到个性工坊的坯布上。
+          <p className="mt-3 text-[11px] leading-relaxed text-dye-800/45">
+            画纸上的笔迹就是重绘区域：绘制完成后可撤销、重置或生成局部纹样。
+            重绘结果仅供工艺效果参考，非真实扎染成品。
           </p>
 
           {hasResult && (
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <span className="text-[11px] text-dye-800/45">对比</span>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="text-[11px] text-dye-800/55">原图 / 结果</span>
               <input
                 type="range"
                 min={0}
                 max={100}
                 value={compare}
+                aria-label="拖动对比原图与重绘结果"
                 onChange={(e) => setCompare(Number(e.target.value))}
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-dye-900/10 accent-dye-700"
+                className="h-1.5 min-w-24 flex-1 cursor-pointer appearance-none rounded-full bg-dye-900/10 accent-dye-700"
               />
               <span className="w-8 text-right font-mono text-[11px] text-dye-700">{compare}%</span>
               {engine && (
@@ -701,79 +583,158 @@ export function InpaintStudio() {
               个。
             </p>
           )}
-
-          <p className="mt-2 text-[11px] leading-relaxed text-dye-800/40">
-            生成图为 AI 工艺效果参考，非真实扎染成品。
-          </p>
         </div>
-      </div>
+      </main>
 
-      {/* 右栏 */}
-      <div className="space-y-4">
-        <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
-          <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">约束技法</p>
+      <aside className="w-full shrink-0 space-y-5 rounded-card border border-dye-900/10 bg-white/70 p-4 shadow-[0_18px_48px_-38px_rgba(16,31,47,0.45)] lg:w-[320px] lg:p-5">
+        <section>
+          <div className="flex items-center justify-between">
+            <h3 className="font-song text-[16px] font-semibold text-dye-900">画笔工具</h3>
+            <span
+              className="h-5 w-5 rounded-full border border-dye-900/15"
+              style={{ backgroundColor: currentColor }}
+              title="当前画笔颜色"
+            />
+          </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            {techniques.map((t) => (
+            {tools.map((item) => (
               <button
-                key={t.id}
-                onClick={() => {
-                  setTechnique(t.id);
-                  setHasResult(false);
-                }}
+                key={item.id}
+                type="button"
+                title={item.hint}
+                aria-pressed={tool === item.id}
+                onClick={() => setTool(item.id)}
                 className={cn(
-                  "rounded-lg border px-2 py-2 text-[11.5px] transition-colors",
-                  techniqueId === t.id
+                  "rounded-lg border px-2 py-2.5 text-[12px] transition-colors",
+                  tool === item.id
                     ? "border-dye-700 bg-dye-700 text-cloth-50"
-                    : "border-dye-900/12 text-dye-800/70 hover:border-dye-700/35",
+                    : "border-dye-900/12 bg-white/70 text-dye-800/65 hover:border-dye-700/35 hover:text-dye-900",
                 )}
               >
-                {t.name}
+                {item.label}
               </button>
             ))}
           </div>
-          <div className="mt-3 flex items-center gap-2">
-            <PatternSwatch
-              seed={techniqueId}
-              motif={technique.motif}
-              palette={technique.palette}
-              className="h-11 w-11 shrink-0 rounded"
-            />
-            <p className="text-[11.5px] leading-relaxed text-dye-800/50">
-              {technique.signature}：{technique.principle.slice(0, 34)}…
-            </p>
-          </div>
-        </section>
 
-        <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
-          <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">
-            用一句话指定区域
-          </p>
-          <textarea
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            rows={2}
-            placeholder="把左上角改成云纹，颜色淡一点"
-            className="mt-3 w-full resize-none rounded-lg border border-dye-900/12 bg-cloth-50 px-3 py-2 text-[12.5px] text-dye-900 placeholder:text-dye-800/35 focus:border-dye-600/45 focus:outline-none"
+          <label htmlFor="inpaint-brush-size" className="mt-5 flex items-center justify-between text-[12px] text-dye-800/65">
+            <span>笔刷粗细</span>
+            <span className="font-mono text-dye-700">{brush}px</span>
+          </label>
+          <input
+            id="inpaint-brush-size"
+            type="range"
+            min={6}
+            max={120}
+            step={2}
+            value={brush}
+            onChange={(event) => setBrush(Number(event.target.value))}
+            className="mt-3 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-dye-900/10 accent-dye-700"
           />
-          <div className="mt-2 flex gap-2">
-            <Button variant="outline" size="sm" onClick={maskFromInstruction}>
-              框选该区域
-            </Button>
-            <Badge tone="cloth">方位解析</Badge>
+          <div className="mt-4">
+            <p className="mb-2 text-[12px] text-dye-800/65">扎染蓝色调色盘</p>
+            <div className="flex items-center gap-2.5" role="group" aria-label="选择画笔颜色">
+              {dyeColors.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  aria-label={color.name}
+                  aria-pressed={currentColor === color.value}
+                  title={color.name}
+                  onClick={() => setCurrentColor(color.value)}
+                  className={cn(
+                    "h-8 w-8 rounded-full border transition-all",
+                    currentColor === color.value
+                      ? "scale-110 border-dye-900 ring-2 ring-dye-700 ring-offset-2"
+                      : "border-dye-900/20 hover:scale-105",
+                  )}
+                  style={{ backgroundColor: color.value }}
+                />
+              ))}
+            </div>
           </div>
-          <p className="mt-2 text-[10.5px] leading-relaxed text-dye-800/40">
-            当前用规则识别「左右上下」并据此生成 mask。接入视觉定位模型后，
-            可以直接说「袖口那圈花纹」这类指代，mask 由模型给出。
-          </p>
+          <button
+            type="button"
+            aria-pressed={mirrorEnabled}
+            onClick={() => setMirrorEnabled((enabled) => !enabled)}
+            className={cn(
+              "mt-4 flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-[12px] transition-colors",
+              mirrorEnabled
+                ? "border-dye-700 bg-dye-700 text-cloth-50"
+                : "border-dye-900/12 bg-white/70 text-dye-800/65 hover:border-dye-700/35 hover:text-dye-900",
+            )}
+          >
+            <span>镜像生花</span>
+            <span className="text-[10px]">{mirrorEnabled ? "开启" : "关闭"}</span>
+          </button>
         </section>
 
-        <section className="rounded-card border border-dye-900/10 bg-white/55 p-5">
-          <p className="dye-mark text-[12px] tracking-[0.16em] text-dye-800/50">重绘轨迹</p>
-          <div className="mt-3">
-            <AgentTrace steps={steps} />
+        <section className="border-t border-dye-900/10 pt-4">
+          <h3 className="font-song text-[16px] font-semibold text-dye-900">操作</h3>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl px-2 text-[12px]"
+              onClick={undo}
+              disabled={!canUndo || generating}
+              title="撤销上一笔"
+            >
+              撤销
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-10 rounded-xl border border-dye-900/12 px-2 text-[12px]"
+              onClick={resetAll}
+              disabled={!canUndo && !hasMask && !hasResult}
+            >
+              重置
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl px-2 text-[12px]"
+              onClick={saveToLibrary}
+              disabled={!hasMask}
+              title="把这张画稿存进「我的」页面"
+            >
+              {savedFlash ? "已保存 ✓" : "保存到我的"}
+            </Button>
+            <Button
+              variant="madder"
+              className="h-10 rounded-xl px-2 text-[12px]"
+              onClick={applyToGarment}
+              disabled={!hasMask}
+              title="把手绘图案贴到个性工坊的坯布上"
+            >
+              应用到实物
+            </Button>
+            <Button
+              className="col-span-2 h-11 rounded-xl text-[13px]"
+              onClick={generate}
+              disabled={!hasMask || generating}
+            >
+              {generating ? "点染中…" : "随心点染"}
+            </Button>
+            {hasResult && (
+              <Button
+                variant="outline"
+                className="col-span-2 h-10 rounded-xl"
+                onClick={download}
+              >
+                下载点染结果
+              </Button>
+            )}
           </div>
+          {generationNotice && (
+            <p
+              role="status"
+              className={`mt-3 text-[11px] leading-relaxed ${
+                engine?.mode === "local" ? "text-madder-500" : "text-dye-700"
+              }`}
+            >
+              {generationNotice}
+            </p>
+          )}
         </section>
-      </div>
+      </aside>
     </div>
   );
 }
