@@ -16,6 +16,7 @@ function formatTime(seconds: number) {
 
 export function CarrierSection() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
   const lastTimeUpdateRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -24,6 +25,22 @@ export function CarrierSection() {
   const [duration, setDuration] = useState(0);
   const [playbackError, setPlaybackError] = useState("");
   const [isHovered, setIsHovered] = useState(false);
+  const [isTextVisible, setIsTextVisible] = useState(false);
+
+  useEffect(() => {
+    const textContainer = textRef.current;
+    if (!textContainer) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsTextVisible(entry.isIntersecting);
+      },
+      { threshold: 0.3 },
+    );
+
+    observer.observe(textContainer);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -136,7 +153,7 @@ export function CarrierSection() {
   return (
     <section
       id="carrier"
-      className="relative overflow-hidden bg-dye-950 py-16 md:py-20"
+      className="relative flex h-screen w-full snap-always snap-start items-center justify-center overflow-hidden bg-dye-950 py-8 md:py-10"
     >
       <div
         aria-hidden
@@ -155,9 +172,16 @@ export function CarrierSection() {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cloth-100/20 to-transparent"
       />
 
-      <div className="relative mx-auto max-w-6xl px-5">
-        <div className="grid items-center gap-10 md:grid-cols-[minmax(0,7fr)_minmax(0,13fr)] md:gap-12">
-          <div className="min-w-0">
+      <div className="relative mx-auto w-full max-w-7xl px-4 md:px-8">
+        <div className="grid w-full items-center gap-10 md:grid-cols-[minmax(0,7fr)_minmax(0,13fr)] md:gap-12">
+          <div
+            ref={textRef}
+            className={`min-w-0 transition-all duration-1000 ease-out ${
+              isTextVisible
+                ? "translate-y-0 opacity-100"
+                : "translate-y-8 opacity-0"
+            }`}
+          >
             <p className="eyebrow text-[9px] text-cloth-100/45">
               From Craft to Creation
             </p>

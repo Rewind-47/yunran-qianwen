@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { newsSorted } from "@/lib/data/news";
 import type { NewsItem } from "@/lib/data/news";
 import { cn } from "@/lib/utils";
@@ -91,15 +94,33 @@ function StoryRow({ item, titleSize = "md" }: { item: NewsItem; titleSize?: "md"
 }
 
 export function NewsCenter() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const stories = newsSorted.filter((n) => n.kind !== "notice");
   const notices = newsSorted.filter((n) => n.kind === "notice").slice(0, 6);
   const feature = stories[0];
   const rest = stories.slice(1, 4);
 
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.2 },
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section
+      ref={sectionRef}
       id="news"
-      className="relative overflow-hidden bg-[linear-gradient(180deg,#DEEAF3_0%,#EAF2F8_18%,#F1F6FA_58%,#F5F9FC_100%)] py-20 md:py-24"
+      className="relative flex h-screen w-full snap-always snap-start flex-col justify-center overflow-hidden bg-[linear-gradient(180deg,#DEEAF3_0%,#EAF2F8_18%,#F1F6FA_58%,#F5F9FC_100%)] py-8 md:py-10"
     >
       {/* 靛蓝晕斑：让整块白底透出染缸里那种浅蓝，和上一屏的深靛蓝接得住 */}
       <div
@@ -138,7 +159,11 @@ export function NewsCenter() {
         </div>
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,5fr)_minmax(0,2fr)] lg:gap-8">
-          <div className="min-w-0">
+          <div
+            className={`min-w-0 transform transition-all duration-1000 ease-out ${
+              isVisible ? "translate-x-0 opacity-100" : "-translate-x-16 opacity-0"
+            }`}
+          >
             {/* 左：竖幅大图，图注压在底部色条里 */}
             <Link href={`/news/${feature.slug}`} className="group block">
               <div className="border border-dye-900/12 bg-white/85 p-2 shadow-[0_12px_32px_-24px_rgba(16,31,47,0.45)]">
@@ -164,7 +189,11 @@ export function NewsCenter() {
           </div>
 
           {/* 中：新闻列表 */}
-          <div className="flex min-w-0 flex-col gap-8">
+          <div
+            className={`flex min-w-0 flex-col gap-8 transition-all duration-1000 ease-out delay-200 ${
+              isVisible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+            }`}
+          >
             {rest.map((item) => (
               <StoryRow key={item.slug} item={item} />
             ))}
@@ -178,7 +207,11 @@ export function NewsCenter() {
           </div>
 
           {/* 右：通知公告 */}
-          <aside className="min-w-0 overflow-hidden rounded-[3px] border border-dye-900/12 border-t-[3px] border-t-dye-800 bg-white/90 shadow-[0_14px_36px_-28px_rgba(16,31,47,0.5)]">
+          <aside
+            className={`min-w-0 overflow-hidden rounded-[3px] border border-dye-900/12 border-t-[3px] border-t-dye-800 bg-white/90 shadow-[0_14px_36px_-28px_rgba(16,31,47,0.5)] transition-all duration-1000 ease-out delay-300 ${
+              isVisible ? "translate-x-0 opacity-100" : "translate-x-16 opacity-0"
+            }`}
+          >
             <div className="flex items-center justify-center gap-2 border-b border-dye-900/[0.07] bg-dye-50/80 px-4 py-3">
               <span aria-hidden className="h-1.5 w-1.5 rotate-45 bg-dye-700/70" />
               <h3 className="font-song text-[14.5px] tracking-[0.3em] text-dye-900">

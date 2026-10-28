@@ -56,7 +56,7 @@ export function HeroBanner() {
   const slide = slides[index];
 
   return (
-    <section className="relative isolate w-full overflow-hidden bg-dye-950">
+    <section className="relative isolate h-screen w-full snap-always snap-start overflow-hidden bg-dye-950">
       {/* 背景大图：整幅铺满，缓慢推近 */}
       <div aria-hidden className="absolute inset-0">
         {slides.map((s, i) => (
@@ -87,7 +87,7 @@ export function HeroBanner() {
         className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-dye-950/80 to-transparent"
       />
 
-      <div className="relative mx-auto flex min-h-[84svh] max-w-6xl flex-col px-5 pt-20 md:min-h-[88svh] md:pt-24">
+      <div className="relative mx-auto flex h-full w-full max-w-6xl flex-col px-5 pt-20 md:pt-24">
         <div className="flex flex-1 flex-col justify-center pb-12 pt-10 md:pb-16">
           {/* 文字随图切换：整块重挂，hero-rise 动画跟着重放，像换了一帧 */}
           <div key={index} className="hero-rise max-w-3xl lg:max-w-[46rem]">

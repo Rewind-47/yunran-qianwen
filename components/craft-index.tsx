@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { styleCategories } from "@/lib/data/styles";
 import { cn } from "@/lib/utils";
 import type { StyleCategory } from "@/lib/data/styles";
@@ -30,8 +33,31 @@ const cardFaces: Record<StyleCategory, { src: string; position: string }> = {
 };
 
 export function CraftIndex() {
+  const cardsRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const cards = cardsRef.current;
+    if (!cards) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.15 },
+    );
+
+    observer.observe(cards);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section id="catalogue" className="relative overflow-hidden bg-dye-950 py-16 md:py-20">
+    <section
+      id="catalogue"
+      className={`relative flex h-screen w-full snap-always snap-start flex-col items-center justify-center overflow-hidden bg-dye-950 px-5 py-8 transition-opacity duration-1000 ${
+        isVisible ? "opacity-100" : "opacity-0"
+      }`}
+    >
       {/* 竖向色条底：深浅靛蓝交替，像晾在竹竿上的一排染布 */}
       <div aria-hidden className="absolute inset-0 flex">
         {Array.from({ length: 14 }).map((_, i) => (
@@ -52,15 +78,14 @@ export function CraftIndex() {
         className="pointer-events-none absolute inset-0 shadow-[inset_0_60px_80px_-40px_rgba(8,18,29,0.9),inset_0_-60px_80px_-40px_rgba(8,18,29,0.9)]"
       />
 
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-5 lg:flex-row lg:gap-12">
-        {/* 栏目标记：桌面竖排靠左，窄屏横排置顶（竖排会挤掉卡片宽度） */}
-        <div className="flex shrink-0 items-center gap-4 lg:items-start">
-          <p className="title-brush text-[21px] leading-[1.3] tracking-[0.16em] text-cloth-50 sm:text-[24px] lg:text-[28px] lg:leading-[1.4] lg:tracking-[0.3em] lg:[writing-mode:vertical-rl]">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-6">
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-4 text-center">
+          <p className="title-brush text-[21px] leading-[1.3] tracking-[0.16em] text-cloth-50 sm:text-[24px] lg:text-[28px] lg:leading-[1.4]">
             扎染品类名录
           </p>
-          <div className="flex items-center gap-3 lg:flex-col lg:gap-3 lg:pt-1 lg:[writing-mode:vertical-rl]">
+          <div className="flex items-center gap-3">
             <span className="eyebrow text-[8.5px] text-cloth-100/40">Catalogue</span>
-            <span className="h-px w-10 bg-cloth-100/20 lg:h-10 lg:w-px" />
+            <span className="h-px w-10 bg-cloth-100/20" />
             <span className="figure text-[10.5px] tracking-[0.2em] text-cloth-100/50">
               共计八类
             </span>
@@ -68,8 +93,11 @@ export function CraftIndex() {
         </div>
 
         {/* 布墙：八块布整幅铺满，图占满整张卡，名目用毛笔艺术字浮在布面上 */}
-        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:h-[360px] lg:items-stretch lg:gap-[5px]">
-          {styleCategories.map((c) => {
+        <div
+          ref={cardsRef}
+          className="grid w-full grid-cols-4 gap-1.5 sm:gap-2 lg:flex lg:h-[360px] lg:items-stretch lg:gap-[5px]"
+        >
+          {styleCategories.map((c, index) => {
             const face = cardFaces[c.id];
             return (
               <Link
@@ -78,7 +106,16 @@ export function CraftIndex() {
                   pathname: "/studio/personal/tie",
                   query: { styleCategory: c.id },
                 }}
-                className="group relative block aspect-[3/4] w-full overflow-hidden rounded-[3px] ring-1 ring-inset ring-cloth-100/15 transition-all duration-500 ease-soft hover:ring-cloth-100/45 lg:aspect-auto lg:h-full lg:flex-1"
+                className={`group relative block aspect-[3/4] w-full overflow-hidden rounded-[3px] ring-1 ring-inset ring-cloth-100/15 transition-all duration-700 ease-out hover:ring-cloth-100/45 lg:aspect-auto lg:h-full lg:flex-1 ${
+                  index % 2 === 0
+                    ? isVisible
+                      ? "translate-y-0 opacity-100"
+                      : "-translate-y-12 opacity-0"
+                    : isVisible
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-12 opacity-0"
+                }`}
+                style={{ transitionDelay: `${index * 100}ms` }}
               >
                 <Image
                   src={face.src}
@@ -117,7 +154,7 @@ export function CraftIndex() {
         </div>
       </div>
 
-      <p className="relative mx-auto mt-12 max-w-6xl px-5 text-[11px] leading-relaxed tracking-[0.08em] text-cloth-100/40">
+      <p className="relative mx-auto mt-6 max-w-6xl text-center text-[11px] leading-relaxed tracking-[0.08em] text-cloth-100/40 sm:mt-8">
         每一类都可以在创作工坊里打版、配色、上手涂鸦，并在三维空间里实时预览 ——
         <Link
           href="/studio/personal"

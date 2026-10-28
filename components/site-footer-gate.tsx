@@ -8,6 +8,6 @@ import { SiteFooter } from "@/components/site-footer";
  */
 export function SiteFooterGate() {
   const pathname = usePathname();
-  if (pathname.startsWith("/studio")) return null;
+  if (pathname === "/" || pathname.startsWith("/studio")) return null;
   return <SiteFooter />;
 }
