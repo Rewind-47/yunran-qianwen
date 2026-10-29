@@ -1,4 +1,4 @@
-import nextOpenNextConfig from '@edgeone/opennextjs-pages';
+import {withEdgeOne} from '@edgeone/opennextjs-pages';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -15,4 +15,4 @@ const nextConfig = {
   },
 };
 
-export default nextOpenNextConfig(nextConfig);
+export default withEdgeOne(nextConfig);
