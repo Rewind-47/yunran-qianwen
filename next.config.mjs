@@ -1,7 +1,8 @@
+import nextOpenNextConfig from '@edgeone/opennextjs-pages';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 默认输出到 .next；本地受限环境可用 NEXT_DIST_DIR 指定其他目录
   distDir: process.env.NEXT_DIST_DIR || ".next",
   images: {
     remotePatterns: [
@@ -14,4 +15,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default nextOpenNextConfig(nextConfig);
