@@ -9,7 +9,13 @@
  * 结构带 version，字段变化时直接丢弃旧数据而不是崩掉。
  */
 
-const KEY = "yunran:works:v1";
+const KEY_PREFIX = "yunran:works:";
+
+function storageKey(username: string) {
+  const normalized = username.trim();
+  if (!normalized) throw new Error("保存作品需要有效的登录用户名。");
+  return `${KEY_PREFIX}${encodeURIComponent(normalized)}:v1`;
+}
 
 export interface SavedWorkState {
   styleId: string;
@@ -82,7 +88,7 @@ function sanitize(value: unknown): SavedWork[] {
       workState,
       previewImage:
         typeof w.previewImage === "string" &&
-        w.previewImage.startsWith("data:image/png")
+        w.previewImage.startsWith("data:image/")
           ? w.previewImage
           : undefined,
     });
@@ -135,26 +141,107 @@ function sanitizeWorkState(value: unknown): SavedWorkState | undefined {
         : undefined,
     previewImage:
       typeof state.previewImage === "string" &&
-      state.previewImage.startsWith("data:image/png")
+      state.previewImage.startsWith("data:image/")
         ? state.previewImage
         : undefined,
   };
 }
 
-export function listWorks(): SavedWork[] {
+export async function persistImageAsDataUrl(imageUrl: string): Promise<string> {
+  if (imageUrl.startsWith("data:image/")) return imageUrl;
+
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`图片下载失败（HTTP ${response.status}）。`);
+  }
+  const blob = await response.blob();
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("下载内容不是有效的图片。");
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("图片转换失败，请重试。"));
+      }
+    };
+    reader.onerror = () => reject(new Error("图片读取失败，请重试。"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export function listWorks(username: string): SavedWork[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
-    const works = raw ? sanitize(JSON.parse(raw)) : [];
+    const key = storageKey(username);
+    const raw = window.localStorage.getItem(key);
+    const works = raw
+      ? sanitize(JSON.parse(raw))
+      : migrateLegacyWorks(username, key);
     return works.sort((a, b) => b.createdAt - a.createdAt);
   } catch {
     return [];
   }
 }
 
+function migrateLegacyWorks(username: string, key: string): SavedWork[] {
+  const raw = window.localStorage.getItem("mock_works");
+  if (!raw) return [];
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return [];
+
+  const migrated = parsed.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const legacy = entry as {
+      id?: unknown;
+      username?: unknown;
+      createdAt?: unknown;
+      previewImage?: unknown;
+      image?: unknown;
+      workState?: unknown;
+    };
+    if (
+      legacy.username !== username ||
+      typeof legacy.id !== "string" ||
+      !legacy.workState ||
+      typeof legacy.workState !== "object"
+    ) {
+      return [];
+    }
+
+    const state = legacy.workState as Partial<SavedWorkState>;
+    const candidate = {
+      ...state,
+      id: legacy.id,
+      createdAt:
+        typeof legacy.createdAt === "number" ? legacy.createdAt : 0,
+      workState: legacy.workState,
+      previewImage:
+        typeof legacy.previewImage === "string"
+          ? legacy.previewImage
+          : typeof legacy.image === "string"
+            ? legacy.image
+            : undefined,
+    };
+    return sanitize([candidate]);
+  });
+
+  if (migrated.length > 0) {
+    window.localStorage.setItem(key, JSON.stringify(migrated));
+  }
+  return migrated;
+}
+
 /** 同一份配置重复保存时不堆重复卡片：按内容签名去重，只刷新时间与 id */
-export function saveWork(input: Omit<SavedWork, "id" | "createdAt">): SavedWork {
-  const works = listWorks();
+export function saveWork(
+  username: string,
+  input: Omit<SavedWork, "id" | "createdAt">,
+): SavedWork {
+  const key = storageKey(username);
+  const works = listWorks(username);
   const signature = JSON.stringify([
     input.styleId,
     input.techniqueId,
@@ -187,7 +274,7 @@ export function saveWork(input: Omit<SavedWork, "id" | "createdAt">): SavedWork 
   const next = [work, ...rest].slice(0, MAX_WORKS);
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(next));
+      window.localStorage.setItem(key, JSON.stringify(next));
     } catch {
       // 隐私模式 / 配额满：静默降级，不打断创作
     }
@@ -195,11 +282,12 @@ export function saveWork(input: Omit<SavedWork, "id" | "createdAt">): SavedWork 
   return work;
 }
 
-export function removeWork(id: string): SavedWork[] {
-  const next = listWorks().filter((w) => w.id !== id);
+export function removeWork(username: string, id: string): SavedWork[] {
+  const key = storageKey(username);
+  const next = listWorks(username).filter((w) => w.id !== id);
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(next));
+      window.localStorage.setItem(key, JSON.stringify(next));
     } catch {
       /* 同上 */
     }

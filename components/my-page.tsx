@@ -130,8 +130,32 @@ function workTechnique(work: SavedWork): Technique | undefined {
   };
 }
 
+function LoginRequiredCard({ onLogin }: { onLogin: () => void }) {
+  return (
+    <div className="mt-5 grid place-items-center rounded-card border border-dashed border-dye-900/15 bg-white/50 px-6 py-14 text-center shadow-[0_16px_40px_-34px_rgba(16,31,47,0.5)]">
+      <div className="grid h-12 w-12 place-items-center rounded-full bg-dye-900/5 text-dye-700">
+        <LockKeyhole aria-hidden="true" size={21} strokeWidth={1.7} />
+      </div>
+      <p className="mt-4 font-song text-base font-semibold text-dye-900">
+        登录后即可查看您的专属资产
+      </p>
+      <p className="mt-2 text-[11.5px] text-dye-800/45">
+        登录以解锁您的作品库、手绘图案与收藏。
+      </p>
+      <button
+        type="button"
+        onClick={onLogin}
+        className="btn-dye mt-5 rounded-full px-6 py-2.5 text-[12.5px] text-cloth-50"
+      >
+        立即登录
+      </button>
+    </div>
+  );
+}
+
 export function MyPage() {
   const [mounted, setMounted] = useState(false);
+  const [assetsLoadedFor, setAssetsLoadedFor] = useState<string | null>(null);
   const [works, setWorks] = useState<SavedWork[]>([]);
   const [sketches, setSketches] = useState<SavedSketch[]>([]);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -145,16 +169,20 @@ export function MyPage() {
     defaultPrivacySettings,
   );
   const [privacyError, setPrivacyError] = useState("");
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const openLoginModal = useUserStore((state) => state.openLoginModal);
   const userInfo = useUserStore((state) => state.userInfo);
   const updateUsername = useUserStore((state) => state.updateUsername);
   const setCustomSketch = useStudioStore((s) => s.setCustomSketch);
   const router = useRouter();
+  const username = isLoggedIn ? userInfo?.username ?? null : null;
 
   useEffect(() => {
-    setWorks(listWorks());
-    setSketches(listSketches());
+    setWorks(username ? listWorks(username) : []);
+    setSketches(username ? listSketches(username) : []);
+    setAssetsLoadedFor(username);
     setMounted(true);
-  }, []);
+  }, [username]);
 
   useEffect(() => {
     try {
@@ -213,22 +241,25 @@ export function MyPage() {
     router.push(`/studio/personal/${category}`);
   }
 
-  const community = useCommunity();
+  const community = useCommunity(username);
 
   const savedWorks = useMemo(
-    () =>
-      community.saved
+    () => username
+      ? community.saved
         .map((id) => communityWorkMap[id])
-        .filter((w): w is CommunityWork => Boolean(w)),
-    [community.saved],
+        .filter((w): w is CommunityWork => Boolean(w))
+      : [],
+    [community.saved, username],
   );
 
   const followedAuthors = useMemo(
-    () => community.following.map((id) => communityAuthorMap[id]).filter(Boolean),
-    [community.following],
+    () => username
+      ? community.following.map((id) => communityAuthorMap[id]).filter(Boolean)
+      : [],
+    [community.following, username],
   );
 
-  const saved = works.filter((w) => workTechnique(w));
+  const saved = username ? works.filter((w) => workTechnique(w)) : [];
 
   function openProfileEditor() {
     setUsernameInput(userInfo?.username ?? "");
@@ -327,8 +358,10 @@ export function MyPage() {
           </p>
         </div>
 
-        {!mounted ? (
+        {!mounted || assetsLoadedFor !== username ? (
           <div className="mt-5 h-40 rounded-card border border-dye-900/10 bg-white/40" />
+        ) : !isLoggedIn ? (
+          <LoginRequiredCard onLogin={openLoginModal} />
         ) : saved.length === 0 ? (
           <div className="mt-5 grid place-items-center rounded-card border border-dashed border-dye-900/15 bg-white/40 px-6 py-14 text-center">
             <p className="text-[13px] text-dye-800/60">还没有保存的成品</p>
@@ -411,7 +444,10 @@ export function MyPage() {
                         </Link>
                         <button
                           type="button"
-                          onClick={() => setWorks(removeWork(work.id))}
+                          onClick={() =>
+                            username &&
+                            setWorks(removeWork(username, work.id))
+                          }
                           className="text-[10.5px] text-madder-500/80 underline-offset-2 hover:text-madder-500 hover:underline"
                         >
                           删除
@@ -435,8 +471,10 @@ export function MyPage() {
           </p>
         </div>
 
-        {!mounted ? (
+        {!mounted || assetsLoadedFor !== username ? (
           <div className="mt-5 h-40 rounded-card border border-dye-900/10 bg-white/40" />
+        ) : !isLoggedIn ? (
+          <LoginRequiredCard onLogin={openLoginModal} />
         ) : sketches.length === 0 ? (
           <div className="mt-5 grid place-items-center rounded-card border border-dashed border-dye-900/15 bg-white/40 px-6 py-12 text-center">
             <p className="text-[13px] text-dye-800/60">还没有手绘图稿</p>
@@ -476,7 +514,10 @@ export function MyPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setSketches(removeSketch(sketch.id))}
+                      onClick={() =>
+                        username &&
+                        setSketches(removeSketch(username, sketch.id))
+                      }
                       className="text-[10.5px] text-madder-500/80 underline-offset-2 hover:text-madder-500 hover:underline"
                     >
                       删除
@@ -510,7 +551,9 @@ export function MyPage() {
           </p>
         </div>
 
-        {savedWorks.length === 0 ? (
+        {!isLoggedIn ? (
+          <LoginRequiredCard onLogin={openLoginModal} />
+        ) : savedWorks.length === 0 ? (
           <div className="mt-5 grid place-items-center rounded-card border border-dashed border-dye-900/15 bg-white/40 px-6 py-12 text-center">
             <p className="text-[13px] text-dye-800/60">还没有收藏广场作品</p>
             <p className="mt-2 max-w-sm text-[11.5px] leading-relaxed text-dye-800/40">
@@ -542,7 +585,7 @@ export function MyPage() {
                     />
                     <button
                       type="button"
-                      onClick={() => toggleSave(work.id)}
+                      onClick={() => toggleSave(username, work.id)}
                       aria-label={`取消收藏 ${work.title}`}
                       className="absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-white/85 text-[12px] text-dye-900 shadow-sm transition-colors hover:bg-white"
                     >
@@ -579,7 +622,7 @@ export function MyPage() {
               <button
                 key={a.id}
                 type="button"
-                onClick={() => toggleFollow(a.id)}
+                onClick={() => toggleFollow(username, a.id)}
                 title="点击取消关注"
                 className="group flex items-center gap-1.5 rounded-full border border-dye-900/12 bg-white/60 py-1 pl-1 pr-2.5 text-[11.5px] text-dye-800/65 transition-colors hover:border-madder-500/35 hover:text-madder-500"
               >

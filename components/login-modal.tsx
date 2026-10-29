@@ -11,7 +11,7 @@ interface LoginModalProps {
 
 interface MockUser {
   username: string;
-  password: string;
+  password: string | number;
 }
 
 type AuthTab = "login" | "register";
@@ -31,7 +31,8 @@ function readMockUsers(): MockUser[] {
         typeof user === "object" &&
         user !== null &&
         typeof user.username === "string" &&
-        typeof user.password === "string",
+        (typeof user.password === "string" ||
+          typeof user.password === "number"),
     )
   ) {
     throw new Error("本地账号数据格式异常，请清理 mock_users 后重试。");
@@ -117,7 +118,8 @@ function LoginModalContent({ onClose }: Pick<LoginModalProps, "onClose">) {
 
       const matchedUser = users.find(
         (user) =>
-          user.username === normalizedUsername && user.password === password,
+          user.username === normalizedUsername &&
+          String(user.password).trim() === String(password).trim(),
       );
       if (!matchedUser) {
         setFeedback({ type: "error", message: "账号或密码错误。" });

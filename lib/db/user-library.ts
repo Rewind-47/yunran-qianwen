@@ -8,7 +8,7 @@
  * 结构带 version，字段变化时可以直接丢弃旧数据而不是崩掉。
  */
 
-const KEY = "yunran:style-library:v1";
+const KEY_PREFIX = "yunran:style-library:";
 
 export interface UserStyleLibrary {
   version: 1;
@@ -21,6 +21,12 @@ const EMPTY: UserStyleLibrary = { version: 1, favorites: [], recent: [], colors:
 
 const MAX_RECENT = 8;
 const MAX_COLORS = 6;
+
+function storageKey(username: string) {
+  const normalized = username.trim();
+  if (!normalized) throw new Error("用户库需要有效的登录用户名。");
+  return `${KEY_PREFIX}${encodeURIComponent(normalized)}:v1`;
+}
 
 function sanitize(value: unknown): UserStyleLibrary {
   if (!value || typeof value !== "object") return { ...EMPTY };
@@ -35,20 +41,24 @@ function sanitize(value: unknown): UserStyleLibrary {
   };
 }
 
-export function readLibrary(): UserStyleLibrary {
-  if (typeof window === "undefined") return { ...EMPTY };
+export function readLibrary(username: string | null): UserStyleLibrary {
+  if (typeof window === "undefined" || !username) return { ...EMPTY };
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(storageKey(username));
     return raw ? sanitize(JSON.parse(raw)) : { ...EMPTY };
   } catch {
     return { ...EMPTY };
   }
 }
 
-function writeLibrary(next: UserStyleLibrary): UserStyleLibrary {
+function writeLibrary(
+  username: string | null,
+  next: UserStyleLibrary,
+): UserStyleLibrary {
+  if (!username) return { ...EMPTY };
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(next));
+      window.localStorage.setItem(storageKey(username), JSON.stringify(next));
     } catch {
       // 隐私模式 / 配额满：功能降级为「本次会话有效」，不打断创作
     }
@@ -56,27 +66,27 @@ function writeLibrary(next: UserStyleLibrary): UserStyleLibrary {
   return next;
 }
 
-export function toggleFavorite(id: string): UserStyleLibrary {
-  const lib = readLibrary();
+export function toggleFavorite(username: string | null, id: string): UserStyleLibrary {
+  const lib = readLibrary(username);
   const favorites = lib.favorites.includes(id)
     ? lib.favorites.filter((x) => x !== id)
     : [id, ...lib.favorites];
-  return writeLibrary({ ...lib, favorites });
+  return writeLibrary(username, { ...lib, favorites });
 }
 
-export function rememberStyle(id: string): UserStyleLibrary {
-  const lib = readLibrary();
+export function rememberStyle(username: string | null, id: string): UserStyleLibrary {
+  const lib = readLibrary(username);
   const recent = [id, ...lib.recent.filter((x) => x !== id)].slice(0, MAX_RECENT);
-  return writeLibrary({ ...lib, recent });
+  return writeLibrary(username, { ...lib, recent });
 }
 
-export function rememberColor(hex: string): UserStyleLibrary {
-  const lib = readLibrary();
+export function rememberColor(username: string | null, hex: string): UserStyleLibrary {
+  const lib = readLibrary(username);
   const color = hex.toUpperCase();
   const colors = [color, ...lib.colors.filter((x) => x !== color)].slice(0, MAX_COLORS);
-  return writeLibrary({ ...lib, colors });
+  return writeLibrary(username, { ...lib, colors });
 }
 
-export function clearLibrary(): UserStyleLibrary {
-  return writeLibrary({ ...EMPTY });
+export function clearLibrary(username: string | null): UserStyleLibrary {
+  return writeLibrary(username, { ...EMPTY });
 }

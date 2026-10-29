@@ -12,11 +12,6 @@ export function generateStaticParams() {
   return families.map((family) => ({ family }));
 }
 
-export function generateMetadata({ params }: { params: { family: string } }) {
-  const hit = techniqueCategories.find((c) => c.id === params.family);
-  return { title: hit ? `创作工坊 · ${hit.label}` : "创作工坊" };
-}
-
 export default function PersonalFamilyPage({
   params,
   searchParams,

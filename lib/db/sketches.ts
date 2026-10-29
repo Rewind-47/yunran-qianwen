@@ -9,7 +9,13 @@
  * 一份数据两处用，不需要两套格式。
  */
 
-const KEY = "yunran:sketches:v1";
+const KEY_PREFIX = "yunran:sketches:";
+
+function storageKey(username: string) {
+  const normalized = username.trim();
+  if (!normalized) throw new Error("保存手绘图案需要有效的登录用户名。");
+  return `${KEY_PREFIX}${encodeURIComponent(normalized)}:v1`;
+}
 
 export interface SavedSketch {
   id: string;
@@ -22,10 +28,10 @@ export interface SavedSketch {
 
 const MAX = 20;
 
-export function listSketches(): SavedSketch[] {
+export function listSketches(username: string): SavedSketch[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(storageKey(username));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -42,10 +48,13 @@ export function listSketches(): SavedSketch[] {
   }
 }
 
-function write(list: SavedSketch[]): SavedSketch[] {
+function write(username: string, list: SavedSketch[]): SavedSketch[] {
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)));
+      window.localStorage.setItem(
+        storageKey(username),
+        JSON.stringify(list.slice(0, MAX)),
+      );
     } catch {
       // 隐私模式 / 配额满：图片体积大，存不下就降级为仅本次会话
     }
@@ -53,8 +62,11 @@ function write(list: SavedSketch[]): SavedSketch[] {
   return list;
 }
 
-export function saveSketch(sketch: Omit<SavedSketch, "id" | "createdAt">): SavedSketch[] {
-  const list = listSketches();
+export function saveSketch(
+  username: string,
+  sketch: Omit<SavedSketch, "id" | "createdAt">,
+): SavedSketch[] {
+  const list = listSketches(username);
   // 同一张稿子不重复存（「保存到我的」后再点「应用到实物」不会出现两张一样的卡）
   if (list.some((s) => s.techniqueId === sketch.techniqueId && s.dataUrl === sketch.dataUrl)) {
     return list;
@@ -64,9 +76,9 @@ export function saveSketch(sketch: Omit<SavedSketch, "id" | "createdAt">): Saved
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     createdAt: Date.now(),
   };
-  return write([item, ...list].slice(0, MAX));
+  return write(username, [item, ...list].slice(0, MAX));
 }
 
-export function removeSketch(id: string): SavedSketch[] {
-  return write(listSketches().filter((s) => s.id !== id));
+export function removeSketch(username: string, id: string): SavedSketch[] {
+  return write(username, listSketches(username).filter((s) => s.id !== id));
 }

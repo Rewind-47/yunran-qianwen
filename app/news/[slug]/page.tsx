@@ -21,9 +21,8 @@ export function generateMetadata({
   params: { slug: string };
 }): Metadata {
   const item = newsBySlug(params.slug);
-  if (!item) return { title: "资讯未找到" };
+  if (!item) return {};
   return {
-    title: item.title,
     description: item.summary,
   };
 }

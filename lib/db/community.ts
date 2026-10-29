@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
  * 共享同一份状态——点收藏，列表上的星标立刻跟着亮，不用手动刷新。
  */
 
-const KEY = "yunran:community:v1";
+const KEY_PREFIX = "yunran:community:";
 
 export interface LocalComment {
   id: string;
@@ -87,30 +87,40 @@ function sanitize(value: unknown): CommunityState {
 
 /* ---------------- 读取 + 订阅 ---------------- */
 
-let cachedRaw: string | null = null;
-let cached: CommunityState = EMPTY;
+const cache = new Map<string, { raw: string | null; state: CommunityState }>();
 
-export function getCommunitySnapshot(): CommunityState {
-  if (typeof window === "undefined") return EMPTY;
+function storageKey(username: string) {
+  const normalized = username.trim();
+  if (!normalized) throw new Error("社区数据需要有效的登录用户名。");
+  return `${KEY_PREFIX}${encodeURIComponent(normalized)}:v1`;
+}
+
+export function getCommunitySnapshot(username: string | null): CommunityState {
+  if (typeof window === "undefined" || !username) return EMPTY;
+  const key = storageKey(username);
   let raw: string | null = null;
   try {
-    raw = window.localStorage.getItem(KEY);
+    raw = window.localStorage.getItem(key);
   } catch {
     return EMPTY;
   }
-  if (raw === cachedRaw) return cached;
-  cachedRaw = raw;
+  const previous = cache.get(key);
+  if (raw === previous?.raw) return previous.state;
   if (!raw) {
-    cached = EMPTY;
-    return cached;
+    cache.set(key, { raw, state: EMPTY });
+    return EMPTY;
   }
   try {
-    cached = sanitize(JSON.parse(raw));
+    const state = sanitize(JSON.parse(raw));
+    cache.set(key, { raw, state });
+    return state;
   } catch {
-    cached = EMPTY;
+    cache.set(key, { raw, state: EMPTY });
+    return EMPTY;
   }
-  return cached;
 }
+
+const getEmptySnapshot = () => EMPTY;
 
 function subscribe(onChange: () => void) {
   if (typeof window === "undefined") return () => {};
@@ -123,17 +133,23 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** React 侧读取：SSR 时为空状态，挂载后自动切到本机数据 */
-export function useCommunity(): CommunityState {
-  return useSyncExternalStore(subscribe, getCommunitySnapshot, () => EMPTY);
+/** React 侧读取：可在未授权访问用户社交资产时禁用本地快照读取 */
+export function useCommunity(username: string | null): CommunityState {
+  return useSyncExternalStore(
+    subscribe,
+    username ? () => getCommunitySnapshot(username) : getEmptySnapshot,
+    getEmptySnapshot,
+  );
 }
 
-function commit(next: CommunityState): CommunityState {
-  cached = next;
-  cachedRaw = JSON.stringify(next);
+function commit(username: string | null, next: CommunityState): CommunityState {
+  if (!username) return EMPTY;
+  const key = storageKey(username);
+  const raw = JSON.stringify(next);
+  cache.set(key, { raw, state: next });
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(KEY, cachedRaw);
+      window.localStorage.setItem(key, raw);
     } catch {
       // 隐私模式 / 配额满：本次会话内仍然生效
     }
@@ -150,49 +166,49 @@ function toggleIn(list: string[], id: string) {
   return list.includes(id) ? list.filter((x) => x !== id) : [id, ...list];
 }
 
-export function toggleLike(workId: string): CommunityState {
-  const s = getCommunitySnapshot();
-  return commit({ ...s, liked: toggleIn(s.liked, workId) });
+export function toggleLike(username: string | null, workId: string): CommunityState {
+  const s = getCommunitySnapshot(username);
+  return commit(username, { ...s, liked: toggleIn(s.liked, workId) });
 }
 
-export function toggleSave(workId: string): CommunityState {
-  const s = getCommunitySnapshot();
-  return commit({ ...s, saved: toggleIn(s.saved, workId) });
+export function toggleSave(username: string | null, workId: string): CommunityState {
+  const s = getCommunitySnapshot(username);
+  return commit(username, { ...s, saved: toggleIn(s.saved, workId) });
 }
 
-export function toggleFollow(authorId: string): CommunityState {
-  const s = getCommunitySnapshot();
-  return commit({ ...s, following: toggleIn(s.following, authorId) });
+export function toggleFollow(username: string | null, authorId: string): CommunityState {
+  const s = getCommunitySnapshot(username);
+  return commit(username, { ...s, following: toggleIn(s.following, authorId) });
 }
 
-export function addWorkComment(workId: string, text: string): CommunityState {
+export function addWorkComment(username: string | null, workId: string, text: string): CommunityState {
   const clean = text.trim().slice(0, 300);
-  if (!clean) return getCommunitySnapshot();
-  const s = getCommunitySnapshot();
+  if (!clean) return getCommunitySnapshot(username);
+  const s = getCommunitySnapshot(username);
   const next = [...(s.comments[workId] ?? []), { id: uid(), text: clean, at: Date.now() }].slice(-40);
-  return commit({ ...s, comments: { ...s.comments, [workId]: next } });
+  return commit(username, { ...s, comments: { ...s.comments, [workId]: next } });
 }
 
-export function sendDirectMessage(authorId: string, text: string): CommunityState {
+export function sendDirectMessage(username: string | null, authorId: string, text: string): CommunityState {
   const clean = text.trim().slice(0, 500);
-  if (!clean) return getCommunitySnapshot();
-  const s = getCommunitySnapshot();
+  if (!clean) return getCommunitySnapshot(username);
+  const s = getCommunitySnapshot(username);
   const list = s.dms[authorId] ?? [];
   const next = [...list, { id: uid(), from: "me" as const, text: clean, at: Date.now() }].slice(-MAX_DM);
-  return commit({ ...s, dms: { ...s.dms, [authorId]: next } });
+  return commit(username, { ...s, dms: { ...s.dms, [authorId]: next } });
 }
 
 /** 模拟对方回话（演示数据：不是真人，也不接大模型，纯本地预置话术） */
-export function receiveDirectMessage(authorId: string, text: string): CommunityState {
-  const s = getCommunitySnapshot();
+export function receiveDirectMessage(username: string | null, authorId: string, text: string): CommunityState {
+  const s = getCommunitySnapshot(username);
   const list = s.dms[authorId] ?? [];
   const next = [...list, { id: uid(), from: "author" as const, text, at: Date.now() }].slice(-MAX_DM);
-  return commit({ ...s, dms: { ...s.dms, [authorId]: next } });
+  return commit(username, { ...s, dms: { ...s.dms, [authorId]: next } });
 }
 
-export function clearConversation(authorId: string): CommunityState {
-  const s = getCommunitySnapshot();
+export function clearConversation(username: string | null, authorId: string): CommunityState {
+  const s = getCommunitySnapshot(username);
   const dms = { ...s.dms };
   delete dms[authorId];
-  return commit({ ...s, dms });
+  return commit(username, { ...s, dms });
 }

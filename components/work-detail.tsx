@@ -24,6 +24,7 @@ import {
 } from "@/lib/db/community";
 import { formatCount, hashString } from "@/lib/utils";
 import type { AgentStep } from "@/lib/types";
+import { useUserStore } from "@/store/use-user-store";
 
 const AVATAR_HUES = ["#1E3F5C", "#2A5578", "#A63D31", "#5B4B7A", "#172E44"];
 
@@ -41,7 +42,10 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
   const author = communityAuthorMap[work.authorId];
   const technique = techniqueMap[work.techniqueId];
   const style = styleMap[work.styleId];
-  const community = useCommunity();
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const userInfo = useUserStore((state) => state.userInfo);
+  const username = isLoggedIn ? userInfo?.username ?? null : null;
+  const community = useCommunity(username);
 
   const [dmOpen, setDmOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -115,7 +119,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
   function submitComment() {
     const text = draft.trim();
     if (!text) return;
-    addWorkComment(work.id, text);
+    addWorkComment(username, work.id, text);
     setDraft("");
     flash("评论已发布");
   }
@@ -242,7 +246,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => toggleFollow(author.id)}
+                onClick={() => toggleFollow(username, author.id)}
                 className={`flex-1 rounded-full border px-4 py-2 text-[12.5px] transition-colors ${
                   following
                     ? "border-dye-900/15 bg-transparent text-dye-800/50 hover:border-dye-900/25"
@@ -287,7 +291,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
                   label: liked ? "已赞" : "点赞",
                   count: work.likes + (liked ? 1 : 0),
                   active: liked,
-                  onClick: () => toggleLike(work.id),
+                  onClick: () => toggleLike(username, work.id),
                 },
                 {
                   key: "save",
@@ -295,7 +299,7 @@ export function WorkDetail({ work }: { work: CommunityWork }) {
                   label: saved ? "已收藏" : "收藏",
                   count: work.saves + (saved ? 1 : 0),
                   active: saved,
-                  onClick: () => toggleSave(work.id),
+                  onClick: () => toggleSave(username, work.id),
                 },
                 {
                   key: "comment",

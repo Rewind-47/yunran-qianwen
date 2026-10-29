@@ -9,6 +9,7 @@ import { buildInpaintPrompt } from "@/lib/prompts";
 import { drawPattern } from "@/lib/render/pattern-canvas";
 import { saveSketch } from "@/lib/db/sketches";
 import { useStudioStore } from "@/store/studio";
+import { useUserStore } from "@/store/use-user-store";
 import { cn } from "@/lib/utils";
 
 const SIZE = 640;
@@ -60,6 +61,9 @@ export function InpaintStudio() {
     accentColor,
     setCustomSketch,
   } = useStudioStore();
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const userInfo = useUserStore((state) => state.userInfo);
+  const openLoginModal = useUserStore((state) => state.openLoginModal);
   const [tool, setTool] = useState<Tool>("line");
   const [brush, setBrush] = useState(26);
   const [currentColor, setCurrentColor] = useState("#2B5B84");
@@ -474,7 +478,15 @@ export function InpaintStudio() {
   function saveToLibrary() {
     const dataUrl = exportSketch();
     if (!dataUrl) return;
-    saveSketch({ techniqueId: technique.id, techniqueName: technique.name, dataUrl });
+    if (!isLoggedIn || !userInfo) {
+      openLoginModal();
+      return;
+    }
+    saveSketch(userInfo.username, {
+      techniqueId: technique.id,
+      techniqueName: technique.name,
+      dataUrl,
+    });
     setSavedFlash(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setSavedFlash(false), 1800);
@@ -484,7 +496,13 @@ export function InpaintStudio() {
   function applyToGarment() {
     const dataUrl = exportSketch();
     if (!dataUrl) return;
-    saveSketch({ techniqueId: technique.id, techniqueName: technique.name, dataUrl });
+    if (isLoggedIn && userInfo) {
+      saveSketch(userInfo.username, {
+        techniqueId: technique.id,
+        techniqueName: technique.name,
+        dataUrl,
+      });
+    }
     setCustomSketch({ id: `${Date.now()}`, dataUrl, name: `手绘 · ${technique.name}` });
     router.push(`/studio/personal/${technique.category}#personal`);
   }

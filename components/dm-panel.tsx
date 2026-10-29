@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/community";
 import { formatCount } from "@/lib/utils";
 import type { CommunityAuthor } from "@/lib/data/community";
+import { useUserStore } from "@/store/use-user-store";
 
 /** 预置话术：演示环境不接真人，也不调模型，避免让用户误以为对面在线 */
 const REPLIES: { test: RegExp; text: string }[] = [
@@ -41,7 +42,10 @@ export function DmPanel({
   open: boolean;
   onClose: () => void;
 }) {
-  const state = useCommunity();
+  const isLoggedIn = useUserStore((store) => store.isLoggedIn);
+  const userInfo = useUserStore((store) => store.userInfo);
+  const username = isLoggedIn ? userInfo?.username ?? null : null;
+  const state = useCommunity(username);
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -81,13 +85,13 @@ export function DmPanel({
   function send() {
     const text = draft.trim();
     if (!text) return;
-    sendDirectMessage(author.id, text);
+    sendDirectMessage(username, author.id, text);
     setDraft("");
     setTyping(true);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       const hit = REPLIES.find((r) => r.test.test(text));
-      receiveDirectMessage(author.id, hit?.text ?? FALLBACK);
+      receiveDirectMessage(username, author.id, hit?.text ?? FALLBACK);
       setTyping(false);
     }, 1400);
   }

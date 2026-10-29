@@ -4,7 +4,6 @@ import { NewsList } from "@/components/news-list";
 import { newsSorted } from "@/lib/data/news";
 
 export const metadata = {
-  title: "资讯中心",
   description:
     "云染千纹的公告、媒体报道、工艺科普与活动信息。全部公告逐条收录，可点开阅读完整稿件。",
 };

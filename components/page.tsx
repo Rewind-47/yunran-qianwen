@@ -6,8 +6,6 @@ import { GalleryGrid } from "@/components/gallery-grid";
 import { ClothBackdrop } from "@/components/section-chrome";
 import { SectionHeading } from "@/components/section-heading";
 
-export const metadata = { title: "非遗图鉴" };
-
 /**
  * 非遗图鉴。
  *

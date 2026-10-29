@@ -29,7 +29,12 @@ import {
   type StyleCategory,
 } from "@/lib/data/styles";
 import { styleDb } from "@/lib/db/style-db";
-import { listWorks, saveWork, type SavedWorkState } from "@/lib/db/works";
+import {
+  listWorks,
+  persistImageAsDataUrl,
+  saveWork,
+  type SavedWorkState,
+} from "@/lib/db/works";
 import {
   readLibrary,
   rememberStyle,
@@ -107,6 +112,7 @@ export function PersonalWorkshop({
   const isLoggedIn = useUserStore((state) => state.isLoggedIn);
   const openLoginModal = useUserStore((state) => state.openLoginModal);
   const userInfo = useUserStore((state) => state.userInfo);
+  const username = isLoggedIn ? userInfo?.username ?? null : null;
 
   const {
     techniqueId,
@@ -166,11 +172,13 @@ export function PersonalWorkshop({
 
   const [category, setCategory] = useState<StyleCategory>(activeStyle.category);
   const [library, setLibrary] = useState<UserStyleLibrary>(EMPTY_LIBRARY);
+  const [libraryLoadedFor, setLibraryLoadedFor] = useState<string | null>(null);
 
   const [view, setView] = useState<ViewAngle>("quarter");
   const [textureDensity, setTextureDensity] = useState(3);
   const [hasModified, setHasModified] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   function markModified() {
     setHasModified(true);
     setIsSaved(false);
@@ -304,8 +312,10 @@ export function PersonalWorkshop({
 
   // 本地库只在挂载后读，避免服务端渲染读到空
   useEffect(() => {
-    setLibrary(readLibrary());
-  }, []);
+    setLibrary(readLibrary(username));
+    setLibraryLoadedFor(username);
+    setIsSaved(false);
+  }, [username]);
 
   // 从推荐位换到别的品类时，左侧分类跟着走
   useEffect(() => {
@@ -340,7 +350,8 @@ export function PersonalWorkshop({
 
   const related = useMemo(() => styleDb.related(activeStyle.id, 4), [activeStyle.id]);
   const specs = useMemo(() => shapeSummary(activeStyle.shape), [activeStyle.shape]);
-  const isFavorite = library.favorites.includes(activeStyle.id);
+  const isFavorite =
+    libraryLoadedFor === username && library.favorites.includes(activeStyle.id);
 
   const activeFamily =
     techniqueCategories.find((c) => c.id === base.category) ?? techniqueCategories[0];
@@ -365,8 +376,8 @@ export function PersonalWorkshop({
   }${Object.values(activeParams).join("-")}`;
 
   // 保存成品：把当前设计打成最小快照存进「我的」页面（lib/db/works.ts）
-  function saveWorkSnapshot() {
-    if (isSaved) return;
+  async function saveWorkSnapshot() {
+    if (isSaved || isSaving) return;
     if (!hasModified) {
       toast.error("请先在白坯布上进行晕染或贴图创作哦");
       return;
@@ -378,19 +389,17 @@ export function PersonalWorkshop({
       return;
     }
 
-    try {
-      const previewImage = capture3DRef.current?.();
-      if (!previewImage) {
-        throw new Error("3D 预览尚未就绪，请稍候再保存。");
-      }
+    const capturedImage = capture3DRef.current?.();
+    if (!capturedImage) {
+      toast.error("3D 预览尚未就绪，请稍候再保存。");
+      return;
+    }
 
+    setIsSaving(true);
+    try {
+      const previewImage = await persistImageAsDataUrl(capturedImage);
       const paintSnapshot =
         cloth && !cloth.isBlank ? cloth.snapshot() : undefined;
-      const mockWorksRaw = window.localStorage.getItem("mock_works");
-      const mockWorks: unknown = mockWorksRaw ? JSON.parse(mockWorksRaw) : [];
-      if (!Array.isArray(mockWorks)) {
-        throw new Error("本地作品数据格式异常，请检查 mock_works。");
-      }
 
       const workState: SavedWorkState = {
         styleId: activeStyle.id,
@@ -407,25 +416,11 @@ export function PersonalWorkshop({
         paint: paintSnapshot,
         previewImage,
       };
-      const savedWork = saveWork({
+      const savedWork = saveWork(userInfo.username, {
         ...workState,
         workState,
         previewImage,
       });
-
-      mockWorks.unshift({
-        id: savedWork.id,
-        image: previewImage,
-        previewImage,
-        createdAt: savedWork.createdAt,
-        username: userInfo.username,
-        avatar: userInfo.avatar,
-        workState,
-      });
-      window.localStorage.setItem(
-        "mock_works",
-        JSON.stringify(mockWorks.slice(0, 60)),
-      );
 
       setIsSaved(true);
       toast.success("作品已安全保存到我的图库");
@@ -433,6 +428,8 @@ export function PersonalWorkshop({
       toast.error(
         error instanceof Error ? `作品保存失败：${error.message}` : "作品保存失败，请稍后重试。",
       );
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -459,10 +456,19 @@ export function PersonalWorkshop({
   }, [initialStyleCategory, setStyle]);
 
   useEffect(() => {
-    if (!workId || requestedWorkId.current === workId) return;
-    requestedWorkId.current = workId;
+    if (!workId) return;
 
-    const savedWork = listWorks().find((work) => work.id === workId);
+    if (!isLoggedIn || !userInfo) {
+      toast.error("请登录后查看并继续调整已保存的作品。");
+      openLoginModal();
+      return;
+    }
+
+    const requestId = `${userInfo.username}:${workId}`;
+    if (requestedWorkId.current === requestId) return;
+    requestedWorkId.current = requestId;
+
+    const savedWork = listWorks(userInfo.username).find((work) => work.id === workId);
     if (!savedWork) {
       toast.error("找不到要恢复的作品，可能已被删除。");
       return;
@@ -502,6 +508,9 @@ export function PersonalWorkshop({
     setRestoreWorkState(savedState);
   }, [
     workId,
+    isLoggedIn,
+    userInfo,
+    openLoginModal,
     setTechnique,
     setStyle,
     setDyeColor,
@@ -549,7 +558,7 @@ export function PersonalWorkshop({
     // 深链或「相关推荐」进来的款式，分组标签也要跟过去，别让选中的卡不在当前组里
     const next = styleMap[id];
     if (next?.group) setGroup(next.group);
-    setLibrary(rememberStyle(id));
+    setLibrary(rememberStyle(username, id));
   }
 
   // 换工艺 = 换笔法，不动模型本身；改颜色 = 换染料
@@ -894,7 +903,9 @@ export function PersonalWorkshop({
                 </p>
               </div>
               <button
-                onClick={() => setLibrary(toggleFavorite(activeStyle.id))}
+                onClick={() =>
+                  setLibrary(toggleFavorite(username, activeStyle.id))
+                }
                 className={cn(
                   "shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] transition-colors",
                   isFavorite
@@ -1378,8 +1389,10 @@ export function PersonalWorkshop({
                     textureDensity={textureDensity}
                     onCaptureReady={handleCaptureReady}
                     onSave={saveWorkSnapshot}
-                    saveDisabled={!hasModified || isSaved}
-                    saveLabel={isSaved ? "已保存" : "保存成品"}
+                    saveDisabled={!hasModified || isSaved || isSaving}
+                    saveLabel={
+                      isSaving ? "正在保存…" : isSaved ? "已保存" : "保存成品"
+                    }
                     fallback={
                       <div className="relative h-full w-full">
                         {isEmbroidery ? (

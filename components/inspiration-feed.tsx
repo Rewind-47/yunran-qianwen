@@ -9,8 +9,6 @@ import { PublishModal, type PublishPayload } from "@/components/publish-modal";
 import { Badge } from "@/components/ui/badge";
 import {
   communityAuthorMap,
-  communityTopics,
-  communityWorks,
   type CommunityAuthor,
   type CommunityWork,
 } from "@/lib/data/community";
@@ -29,7 +27,8 @@ const sorts = [
 ] as const;
 
 type SortId = (typeof sorts)[number]["id"];
-const PUBLISHED_WORKS_KEY = "mock_gallery";
+const PUBLISHED_WORKS_KEY = "user_published_works";
+const LEGACY_PUBLISHED_WORKS_KEY = "mock_gallery";
 
 const craftFilters: { id: "all" | TechniqueCategory; label: string }[] = [
   { id: "all", label: "全部" },
@@ -50,22 +49,25 @@ export function InspirationFeed() {
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [running, setRunning] = useState(false);
   const [publishedWorks, setPublishedWorks] = useState<CommunityWork[]>([]);
+  const [worksLoaded, setWorksLoaded] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
-  const [publishImageUrl, setPublishImageUrl] = useState("");
   const isLoggedIn = useUserStore((state) => state.isLoggedIn);
   const userInfo = useUserStore((state) => state.userInfo);
   const openLoginModal = useUserStore((state) => state.openLoginModal);
 
-  const community = useCommunity();
+  const username = isLoggedIn ? userInfo?.username ?? null : null;
+  const community = useCommunity(username);
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(PUBLISHED_WORKS_KEY);
-      if (!saved) return;
-      const parsed: unknown = JSON.parse(saved);
+      const current = window.localStorage.getItem(PUBLISHED_WORKS_KEY);
+      const legacy = window.localStorage.getItem(LEGACY_PUBLISHED_WORKS_KEY);
+      const saved = current ?? legacy;
+      const parsed: unknown = saved ? JSON.parse(saved) : [];
       if (!Array.isArray(parsed)) {
-        throw new Error("本地广场作品数据格式异常。");
+        throw new Error("本地已发布作品数据格式异常。");
       }
+
       const validWorks = parsed.filter(
         (work): work is CommunityWork =>
           Boolean(work) &&
@@ -75,21 +77,42 @@ export function InspirationFeed() {
           typeof work.authorId === "string" &&
           typeof work.techniqueId === "string" &&
           typeof work.imageUrl === "string" &&
+          work.imageUrl.length > 0 &&
           Array.isArray(work.palette) &&
           Array.isArray(work.comments),
       );
-      setPublishedWorks(validWorks);
+      const userWorks =
+        current === null
+          ? validWorks.filter(
+              (work) =>
+                work.id.startsWith("published-") ||
+                work.authorId.startsWith("local-"),
+            )
+          : validWorks;
+      setPublishedWorks(userWorks);
+
+      if (legacy !== null) {
+        if (current === null) {
+          window.localStorage.setItem(
+            PUBLISHED_WORKS_KEY,
+            JSON.stringify(userWorks),
+          );
+        }
+        window.localStorage.removeItem(LEGACY_PUBLISHED_WORKS_KEY);
+      }
     } catch (error) {
       toast.error(
         error instanceof Error
-          ? `读取已发布作品失败：${error.message}`
-          : "读取已发布作品失败。",
+          ? `读取真实发布作品失败：${error.message}`
+          : "读取真实发布作品失败。",
       );
+    } finally {
+      setWorksLoaded(true);
     }
   }, []);
 
   const list = useMemo(() => {
-    const allWorks = [...publishedWorks, ...communityWorks];
+    const allWorks = [...publishedWorks];
     const rows =
       craft === "all"
         ? allWorks
@@ -100,17 +123,10 @@ export function InspirationFeed() {
       );
     }
     if (sort === "hot") return rows.sort((a, b) => b.likes - a.likes);
-    // 推荐：本周精选优先，其余按收藏数
-    return rows.sort((a, b) => {
-      const userPublished =
-        Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
-      if (userPublished !== 0) return userPublished;
-      const f = Number(Boolean(b.featured)) - Number(Boolean(a.featured));
-      return f !== 0 ? f : b.saves - a.saves;
-    });
+    return rows.sort(
+      (a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0),
+    );
   }, [sort, craft, publishedWorks]);
-
-  const topics = useMemo(() => communityTopics(6), []);
 
   function beginPublish() {
     if (!isLoggedIn || !userInfo) {
@@ -119,18 +135,6 @@ export function InspirationFeed() {
       return;
     }
 
-    try {
-      const savedWorks = window.localStorage.getItem("mock_works");
-      const parsed: unknown = savedWorks ? JSON.parse(savedWorks) : [];
-      const latestImage =
-        Array.isArray(parsed) && parsed.length > 0
-          ? parsed[0]?.previewImage
-          : "";
-      setPublishImageUrl(typeof latestImage === "string" ? latestImage : "");
-    } catch {
-      toast.error("读取本地作品图片失败，请重新上传图片后发布。");
-      setPublishImageUrl("");
-    }
     setPublishOpen(true);
   }
 
@@ -164,7 +168,6 @@ export function InspirationFeed() {
       at: new Date(now).toLocaleString("zh-CN"),
       publishedAt: now,
       imageUrl: payload.imageUrl,
-      featured: false,
       comments: [],
     };
     const nextWorks = [work, ...publishedWorks];
@@ -172,7 +175,7 @@ export function InspirationFeed() {
     try {
       window.localStorage.setItem(
         PUBLISHED_WORKS_KEY,
-        JSON.stringify([...nextWorks, ...communityWorks]),
+        JSON.stringify(nextWorks),
       );
       setPublishedWorks(nextWorks);
       setPublishOpen(false);
@@ -223,7 +226,13 @@ export function InspirationFeed() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div
+      className={`grid gap-6 ${
+        publishedWorks.length > 0
+          ? "lg:grid-cols-[minmax(0,1fr)_340px]"
+          : ""
+      }`}
+    >
       <div>
         <div className="mb-5 flex justify-end">
           <button
@@ -236,45 +245,92 @@ export function InspirationFeed() {
           </button>
         </div>
 
-        {/* 筛选条 */}
-        <div className="flex flex-wrap items-center gap-2">
-          {craftFilters.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setCraft(f.id)}
-              className={`rounded-full border px-3.5 py-1.5 text-[12.5px] transition-colors ${
-                craft === f.id
-                  ? "border-dye-700 bg-dye-700 text-cloth-50"
-                  : "border-dye-900/12 text-dye-800/60 hover:border-dye-700/35 hover:text-dye-900"
-              }`}
+        {!worksLoaded ? (
+          <div
+            role="status"
+            className="mt-10 rounded-card border border-dye-900/10 bg-white/55 px-6 py-16 text-center text-sm text-dye-800/50"
+          >
+            正在读取已发布作品…
+          </div>
+        ) : publishedWorks.length === 0 ? (
+          <div className="mt-8 flex min-h-[440px] flex-col items-center justify-center rounded-card border border-dye-900/10 bg-white/55 px-6 py-12 text-center">
+            <div className="mb-6 grid h-24 w-24 place-items-center rounded-full border border-dye-900/10 bg-cloth-100 text-dye-700">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 64 64"
+                fill="none"
+                className="h-14 w-14"
+              >
+                <path
+                  d="M12 22.5 32 12l20 10.5v26L32 59 12 48.5v-26Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="m12.5 22.5 19.5 10 19.5-10M32 33v25M22 17.3l20 10.4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+                <circle cx="32" cy="33" r="4" fill="currentColor" />
+              </svg>
+            </div>
+            <h2 className="font-song text-2xl font-semibold text-dye-900">
+              这里还静悄悄的...
+            </h2>
+            <p className="mt-3 text-sm text-dye-800/55">
+              成为第一个分享非遗灵感的创作者吧！
+            </p>
+            <Link
+              href="/studio"
+              className="mt-7 inline-flex h-12 items-center justify-center rounded-full bg-dye-800 px-8 text-sm font-medium text-cloth-50 shadow-lg shadow-dye-900/15 transition hover:-translate-y-0.5 hover:bg-dye-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-dye-200"
             >
-              {f.label}
-            </button>
-          ))}
+              去创作工坊
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {craftFilters.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setCraft(f.id)}
+                  className={`rounded-full border px-3.5 py-1.5 text-[12.5px] transition-colors ${
+                    craft === f.id
+                      ? "border-dye-700 bg-dye-700 text-cloth-50"
+                      : "border-dye-900/12 text-dye-800/60 hover:border-dye-700/35 hover:text-dye-900"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
 
-          <span className="mx-1 h-4 w-px bg-dye-900/10" />
+              <span className="mx-1 h-4 w-px bg-dye-900/10" />
 
-          {sorts.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSort(s.id)}
-              className={`text-[12.5px] transition-colors ${
-                sort === s.id
-                  ? "text-dye-900 underline decoration-dye-700/40 decoration-2 underline-offset-[6px]"
-                  : "text-dye-800/45 hover:text-dye-800/75"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
+              {sorts.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSort(s.id)}
+                  className={`text-[12.5px] transition-colors ${
+                    sort === s.id
+                      ? "text-dye-900 underline decoration-dye-700/40 decoration-2 underline-offset-[6px]"
+                      : "text-dye-800/45 hover:text-dye-800/75"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
 
-          <span className="ml-auto text-[11.5px] text-dye-800/40">{list.length} 件成品</span>
-        </div>
+              <span className="ml-auto text-[11.5px] text-dye-800/40">
+                {list.length} 件成品
+              </span>
+            </div>
 
-        {/* 成品网格 */}
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {list.length > 0 ? (
+              <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((work) => {
             const author: CommunityAuthor = communityAuthorMap[work.authorId] ?? {
               id: work.authorId,
@@ -304,31 +360,15 @@ export function InspirationFeed() {
                     canvasClassName="transition-transform duration-[900ms] ease-soft group-hover:scale-[1.04]"
                   />
 
-                  {/* 整块可点，按钮浮在上面 */}
-                  <Link
-                    href={
-                      work.imageUrl
-                        ? "/inspiration"
-                        : `/inspiration/${work.id}`
-                    }
-                    aria-label={`查看 ${work.title}`}
-                    className="absolute inset-0 z-10"
-                  />
-
                   <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-3">
                     <span className="rounded-full bg-white/78 px-2.5 py-[3px] text-[10px] tracking-[0.08em] text-dye-800/75 backdrop-blur-sm">
                       {craftLabel(work)}
                     </span>
-                    {work.featured && (
-                      <span className="rounded-full bg-madder-500/90 px-2 py-[3px] text-[9.5px] tracking-[0.1em] text-cloth-50">
-                        本周精选
-                      </span>
-                    )}
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => toggleSave(work.id)}
+                    onClick={() => toggleSave(username, work.id)}
                     aria-label={saved ? `取消收藏 ${work.title}` : `收藏 ${work.title}`}
                     aria-pressed={saved}
                     className={`absolute right-2.5 top-11 z-20 grid h-8 w-8 place-items-center rounded-full text-[13px] backdrop-blur-sm transition-all duration-300 ${
@@ -369,7 +409,7 @@ export function InspirationFeed() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => toggleFollow(author.id)}
+                      onClick={() => toggleFollow(username, author.id)}
                       className={`relative z-20 shrink-0 rounded-full border px-2 py-[2px] text-[10.5px] transition-colors ${
                         following
                           ? "border-dye-900/12 text-dye-800/40"
@@ -400,7 +440,7 @@ export function InspirationFeed() {
                   <div className="mt-auto flex items-center gap-3 pt-3 text-[11px] text-dye-800/45">
                     <button
                       type="button"
-                      onClick={() => toggleLike(work.id)}
+                      onClick={() => toggleLike(username, work.id)}
                       aria-pressed={liked}
                       className={`flex items-center gap-1 transition-colors ${
                         liked ? "text-madder-500" : "hover:text-dye-900"
@@ -439,10 +479,18 @@ export function InspirationFeed() {
               </article>
             );
           })}
-        </div>
+              </div>
+            ) : (
+              <p className="mt-10 rounded-card border border-dye-900/10 bg-white/55 px-6 py-12 text-center text-sm text-dye-800/50">
+                当前筛选下还没有作品。
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       {/* 侧栏 */}
+      {publishedWorks.length > 0 && (
       <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100svh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
         <div className="rounded-card border border-dye-900/10 bg-white/55 p-5">
           <div className="flex items-center justify-between gap-2">
@@ -483,30 +531,10 @@ export function InspirationFeed() {
           {running && <p className="mt-3 text-[11px] text-dye-700/50">正在读这件作品…</p>}
         </div>
 
-        <div className="rounded-card border border-dye-900/10 bg-cloth-100/60 p-5">
-          <p className="text-[12px] tracking-[0.16em] text-dye-800/45">广场话题</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {topics.map((t) => (
-              <button
-                key={t.tag}
-                type="button"
-                onClick={() => setCraft("all")}
-                className="rounded-full border border-dye-900/12 bg-white/60 px-2.5 py-1 text-[11px] text-dye-800/60 transition-colors hover:border-dye-700/35 hover:text-dye-900"
-              >
-                #{t.tag}
-                <span className="ml-1 text-dye-800/30">{t.count}</span>
-              </button>
-            ))}
-          </div>
-          <p className="mt-4 text-[11.5px] leading-relaxed text-dye-800/50">
-            广场里的每件成品都保留完整参数。点进去能看到作者的手记与评论，
-            也可以私信问做法——比看一百张参考图有用。
-          </p>
-        </div>
       </aside>
+      )}
       <PublishModal
         isOpen={publishOpen}
-        imageUrl={publishImageUrl}
         onClose={() => setPublishOpen(false)}
         onPublish={handlePublish}
       />

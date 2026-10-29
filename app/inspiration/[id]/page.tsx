@@ -13,9 +13,8 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { id: string } }): Metadata {
   const work = communityWorkMap[params.id];
-  if (!work) return { title: "作品未找到" };
+  if (!work) return {};
   return {
-    title: `${work.title} · 灵感广场`,
     description: work.note.slice(0, 80),
   };
 }

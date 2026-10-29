@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState, type FormEvent } from "react";
+import { listWorks } from "@/lib/db/works";
+import { useUserStore } from "@/store/use-user-store";
 
 export interface PublishPayload {
   title: string;
@@ -10,70 +13,75 @@ export interface PublishPayload {
 
 interface PublishModalProps {
   isOpen: boolean;
-  imageUrl: string;
   onClose: () => void;
   onPublish: (payload: PublishPayload) => void;
 }
 
+interface SavedWorkImage {
+  id: string;
+  imageUrl: string;
+}
+
 export function PublishModal({
   isOpen,
-  imageUrl,
   onClose,
   onPublish,
 }: PublishModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [previewUrl, setPreviewUrl] = useState(imageUrl);
+  const [works, setWorks] = useState<SavedWorkImage[]>([]);
+  const [worksLoadedFor, setWorksLoadedFor] = useState<string | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState("");
   const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isLoggedIn = useUserStore((state) => state.isLoggedIn);
+  const userInfo = useUserStore((state) => state.userInfo);
+  const username = isLoggedIn ? userInfo?.username ?? null : null;
 
   useEffect(() => {
     if (!isOpen) return;
     setTitle("");
     setDescription("");
-    setPreviewUrl(imageUrl);
+    setSelectedImageUrl("");
     setError("");
-  }, [isOpen, imageUrl]);
+    if (!username) {
+      setWorks([]);
+      setWorksLoadedFor(null);
+      return;
+    }
+    try {
+      const savedWorks = listWorks(username).flatMap((work) =>
+        work.previewImage ? [{ id: work.id, imageUrl: work.previewImage }] : [],
+      );
+      setWorks(savedWorks);
+      setWorksLoadedFor(username);
+    } catch (loadError) {
+      setWorks([]);
+      setWorksLoadedFor(username);
+      setError(
+        loadError instanceof Error
+          ? `读取作品库失败：${loadError.message}`
+          : "读取作品库失败，请稍后重试。",
+      );
+    }
+  }, [isOpen, username]);
 
   if (!isOpen) return null;
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("请选择图片文件。");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setPreviewUrl(reader.result);
-        setError("");
-      } else {
-        setError("图片读取失败，请重试。");
-      }
-    };
-    reader.onerror = () => setError("图片读取失败，请重试。");
-    reader.readAsDataURL(file);
-  }
-
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!title.trim()) {
-      setError("请填写作品标题。");
+    if (!selectedImageUrl) {
+      setError("请先从我的作品库中选择一张图片。");
       return;
     }
-    if (!previewUrl) {
-      setError("请先选择一张作品图片。");
+    if (!title.trim()) {
+      setError("请填写作品标题。");
       return;
     }
 
     onPublish({
       title: title.trim(),
       description: description.trim(),
-      imageUrl: previewUrl,
+      imageUrl: selectedImageUrl,
     });
   }
 
@@ -117,35 +125,56 @@ export function PublishModal({
           </div>
 
           <div className="mt-6">
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-              {previewUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={previewUrl}
-                  alt="待发布作品预览"
-                  className="max-h-64 min-h-44 w-full object-contain"
-                />
-              ) : (
-                <div className="grid min-h-44 place-items-center px-5 text-center text-sm text-slate-400">
-                  暂无作品图片，请从本地选择一张图片
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-white/90 px-3.5 py-2 text-xs font-medium text-blue-950 shadow-sm backdrop-blur transition-colors hover:bg-white"
-              >
-                重新选择图片
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-                aria-label="选择作品图片"
-              />
-            </div>
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+              我的作品库
+            </h3>
+            {worksLoadedFor !== username ? (
+              <p role="status" className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
+                正在读取作品库…
+              </p>
+            ) : works.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {works.map((work, index) => {
+                  const isSelected = selectedImageUrl === work.imageUrl;
+                  return (
+                    <button
+                      key={`${work.id}-${index}`}
+                      type="button"
+                      aria-label={`选择作品 ${index + 1}`}
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        setSelectedImageUrl(work.imageUrl);
+                        setError("");
+                      }}
+                      className={`group aspect-square overflow-hidden rounded-xl border-2 bg-slate-100 transition hover:scale-[1.02] hover:border-blue-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 ${
+                        isSelected
+                          ? "border-blue-700 ring-2 ring-blue-200"
+                          : "border-transparent"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={work.imageUrl}
+                        alt={`我的作品 ${index + 1}`}
+                        className="w-full h-full object-cover rounded-lg transition-transform duration-200 group-hover:scale-105"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+                <p className="text-sm text-slate-500">
+                  您还没有保存过作品，请先去工坊创作吧
+                </p>
+                <Link
+                  href="/studio/personal"
+                  className="mt-4 inline-flex h-9 items-center rounded-full bg-blue-900 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-950"
+                >
+                  去创作工坊
+                </Link>
+              </div>
+            )}
           </div>
 
           <label
@@ -157,7 +186,10 @@ export function PublishModal({
           <input
             id="publish-title"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setError("");
+            }}
             maxLength={60}
             placeholder="给这件作品起个名字"
             className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-800 focus:bg-white focus:ring-4 focus:ring-blue-100"
@@ -195,7 +227,8 @@ export function PublishModal({
             </button>
             <button
               type="submit"
-              className="h-10 rounded-full bg-blue-900 px-6 text-sm font-medium text-white shadow-md shadow-blue-900/15 transition-colors hover:bg-blue-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+              disabled={!selectedImageUrl || !title.trim()}
+              className="h-10 rounded-full bg-blue-900 px-6 text-sm font-medium text-white shadow-md shadow-blue-900/15 transition-colors hover:bg-blue-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
             >
               确认发布
             </button>
