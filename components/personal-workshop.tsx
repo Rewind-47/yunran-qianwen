@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PatternSwatch } from "@/components/pattern-swatch";
-import { StyleSilhouette } from "@/components/style-silhouette";
 import { EmbroiderySwatch } from "@/components/embroidery-swatch";
 import { AgentTrace } from "@/components/agent-trace";
 import { Button } from "@/components/ui/button";
@@ -170,6 +169,13 @@ export function PersonalWorkshop({
 
   const [view, setView] = useState<ViewAngle>("quarter");
   const [textureDensity, setTextureDensity] = useState(3);
+  const [hasModified, setHasModified] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  function markModified() {
+    setHasModified(true);
+    setIsSaved(false);
+  }
+
   const capture3DRef = useRef<(() => string) | null>(null);
   const handleCaptureReady = useCallback((capture: (() => string) | null) => {
     capture3DRef.current = capture;
@@ -220,6 +226,7 @@ export function PersonalWorkshop({
     sketchRef.current = customSketch.id;
     void cloth.applySketch(customSketch.dataUrl).then(() => {
       setPaintStrokes(cloth.strokes);
+      markModified();
       setPaintOn(true);
       flashTip(`已把「${customSketch.name}」贴到坯布上`);
     });
@@ -230,6 +237,7 @@ export function PersonalWorkshop({
     clearCustomSketch();
     sketchRef.current = null;
     setPaintStrokes(cloth?.strokes ?? 0);
+    markModified();
     setPaintOn(true);
     flashTip("已移除手绘图案");
   }
@@ -248,6 +256,7 @@ export function PersonalWorkshop({
       stroke: (layer, u, v) => cloth.strokeTo(layer, u, v, brush),
       end: () => {
         setPaintStrokes(cloth.strokes);
+        if (cloth.strokes > 0) markModified();
       },
       layerOf: (object) => {
         const mat = (object as THREE.Mesh).material as
@@ -281,11 +290,6 @@ export function PersonalWorkshop({
   const [patternError, setPatternError] = useState<string | null>(null);
   const [engine, setEngine] = useState<{ mode: "llm" | "local"; label: string } | null>(null);
 
-  const handlePatternImageError = useCallback((message: string) => {
-    setAppliedPatternUrl(null);
-    setPatternError(message);
-  }, []);
-
   useEffect(() => {
     if (previousStyleId.current === activeStyle.id) return;
     previousStyleId.current = activeStyle.id;
@@ -294,6 +298,8 @@ export function PersonalWorkshop({
     setAppliedPatternUrl(null);
     setGeneratedPattern(null);
     setPatternError(null);
+    setHasModified(false);
+    setIsSaved(false);
   }, [activeStyle.id, cloth]);
 
   // 本地库只在挂载后读，避免服务端渲染读到空
@@ -359,9 +365,13 @@ export function PersonalWorkshop({
   }${Object.values(activeParams).join("-")}`;
 
   // 保存成品：把当前设计打成最小快照存进「我的」页面（lib/db/works.ts）
-  const [savedFlash, setSavedFlash] = useState(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function saveWorkSnapshot() {
+    if (isSaved) return;
+    if (!hasModified) {
+      toast.error("请先在白坯布上进行晕染或贴图创作哦");
+      return;
+    }
+
     if (!isLoggedIn || !userInfo) {
       toast.error("请先登录后再保存作品");
       openLoginModal();
@@ -417,9 +427,7 @@ export function PersonalWorkshop({
         JSON.stringify(mockWorks.slice(0, 60)),
       );
 
-      setSavedFlash(true);
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setSavedFlash(false), 1600);
+      setIsSaved(true);
       toast.success("作品已安全保存到我的图库");
     } catch (error) {
       toast.error(
@@ -520,6 +528,8 @@ export function PersonalWorkshop({
     setTextureDensity(restoreWorkState.textureDensity);
     setGeneratedPattern(restoreWorkState.generatedPattern ?? null);
     setAppliedPatternUrl(restoreWorkState.appliedPatternUrl ?? null);
+    setHasModified(Boolean(restoreWorkState.paint || restoreWorkState.appliedPatternUrl));
+    setIsSaved(false);
     setPaintOn(true);
 
     if (restoreWorkState.paint) {
@@ -579,6 +589,7 @@ export function PersonalWorkshop({
         throw new Error(result.error ?? "扎染纹样生成失败，请稍后重试");
       }
       setGeneratedPattern({ imageUrl: result.imageUrl, model: result.model });
+      markModified();
     } catch (error) {
       setPatternError(error instanceof Error ? error.message : "扎染纹样生成失败");
     } finally {
@@ -588,13 +599,26 @@ export function PersonalWorkshop({
 
   function applyGeneratedPattern() {
     if (!generatedPattern) return;
+    if (!cloth) {
+      toast.error("布面尚未准备好，请稍后再应用纹样。");
+      return;
+    }
 
-    cloth?.reset();
-    setPaintStrokes(0);
+    const patternUrl = `/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`;
     setPatternError(null);
-    setAppliedPatternUrl(
-      `/api/image-proxy?url=${encodeURIComponent(generatedPattern.imageUrl)}`,
-    );
+    void cloth
+      .applyPattern(patternUrl)
+      .then((applied) => {
+        if (!applied) return;
+        setPaintStrokes(cloth.strokes);
+        setAppliedPatternUrl(patternUrl);
+        markModified();
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "未知错误";
+        setPatternError(`纹样应用失败：${message}`);
+        toast.error(`纹样应用失败：${message}`);
+      });
   }
 
   function choosePattern(id: typeof patternId) {
@@ -609,14 +633,18 @@ export function PersonalWorkshop({
     if (!cloth) return;
     if (cloth.undo()) {
       setPaintStrokes(cloth.strokes);
+      markModified();
       flashTip("已撤销上一笔");
     }
   }
 
   function clearPaint() {
-    if (!cloth || paintStrokes === 0) return;
+    if (!cloth || cloth.isBlank) return;
     cloth.clear();
     setPaintStrokes(0);
+    setAppliedPatternUrl(null);
+    setHasModified(false);
+    setIsSaved(false);
     flashTip("坯布已洗净");
   }
 
@@ -831,47 +859,23 @@ export function PersonalWorkshop({
               <button
                 key={s.id}
                 onClick={() => chooseStyle(s.id)}
+                aria-pressed={styleId === s.id}
                 className={cn(
-                  "group overflow-hidden rounded-lg border text-left transition-all",
+                  "rounded-lg border px-3 py-3 text-left transition-colors",
                   styleId === s.id
-                    ? "border-dye-700 shadow-[0_10px_24px_-16px_rgba(16,31,47,0.9)]"
-                    : "border-dye-900/10 hover:border-dye-700/35",
+                    ? "border-dye-700 bg-dye-700 text-cloth-50"
+                    : "border-dye-900/10 bg-white/70 text-dye-800/75 hover:border-dye-700/35",
                 )}
                 title={`${s.name} · ${s.tags.join(" / ")}`}
               >
-                <div className="relative aspect-[4/5] w-full bg-[#F7F6F3]">
-                  <StyleSilhouette style={s} />
-                  {library.favorites.includes(s.id) && (
-                    <span className="absolute right-1.5 top-1.5 text-[10px] text-madder-400">★</span>
-                  )}
-                  <span
-                    className={cn(
-                      "absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[8.5px] transition-opacity",
-                      styleId === s.id
-                        ? "bg-dye-700/90 text-cloth-50"
-                        : "bg-white/75 text-dye-800/50 opacity-0 group-hover:opacity-100",
-                    )}
-                  >
-                    {styleId === s.id ? "已选" : "选这款"}
-                  </span>
-                </div>
+                <span className="block truncate text-[11.5px]">{s.name}</span>
                 <span
                   className={cn(
-                    "block border-t px-2 py-1.5",
-                    styleId === s.id
-                      ? "border-dye-700 bg-dye-700 text-cloth-50"
-                      : "border-dye-900/10 bg-white/70 text-dye-800/75",
+                    "mt-1 block truncate text-[9px] tracking-[0.06em]",
+                    styleId === s.id ? "text-cloth-100/60" : "text-dye-800/40",
                   )}
                 >
-                  <span className="block truncate text-[11.5px]">{s.name}</span>
-                  <span
-                    className={cn(
-                      "mt-0.5 block truncate text-[9px] tracking-[0.06em]",
-                      styleId === s.id ? "text-cloth-100/60" : "text-dye-800/40",
-                    )}
-                  >
-                    {s.en}
-                  </span>
+                  {s.en}
                 </span>
               </button>
             ))}
@@ -1326,7 +1330,7 @@ export function PersonalWorkshop({
               <div
                 role="group"
                 aria-label="交互模式"
-                className="flex items-center rounded-full border border-dye-900/12 bg-white/60 p-0.5"
+                className="flex flex-nowrap items-center whitespace-nowrap rounded-full border border-dye-900/12 bg-white/60 p-0.5"
               >
                 {[
                   { on: true, label: "涂抹", tip: "按住鼠标在坯布上画，工艺决定笔法" },
@@ -1341,7 +1345,7 @@ export function PersonalWorkshop({
                       aria-pressed={active}
                       title={m.tip}
                       className={cn(
-                        "rounded-full px-2.5 py-0.5 text-[10.5px] transition-colors",
+                        "flex min-w-[80px] flex-1 items-center justify-center whitespace-nowrap rounded-full border border-transparent px-2.5 py-0.5 text-[10.5px] transition-colors",
                         active
                           ? "bg-dye-800 text-cloth-50"
                           : "text-dye-800/60 hover:text-dye-900",
@@ -1352,19 +1356,6 @@ export function PersonalWorkshop({
                   );
                 })}
               </div>
-              <button
-                type="button"
-                onClick={saveWorkSnapshot}
-                title="把当前设计存进「我的」页面"
-                className={cn(
-                  "rounded-full border px-2.5 py-0.5 text-[10.5px] transition-colors",
-                  savedFlash
-                    ? "border-woad-500/60 bg-woad-500/15 text-woad-600"
-                    : "border-dye-900/15 bg-white/60 text-dye-800/60 hover:border-dye-700/40 hover:text-dye-900",
-                )}
-              >
-                {savedFlash ? "已保存 ✓" : "保存成品"}
-              </button>
             </div>
           </div>
 
@@ -1372,44 +1363,48 @@ export function PersonalWorkshop({
             <div className="relative aspect-[4/3] w-full bg-[#F5F4F0] md:aspect-[16/11] lg:aspect-[16/10]">
               {/* 画框式留白：画布四周（尤其上下）留出呼吸空间，不再顶满面板 */}
               <div className="absolute inset-0 p-3 sm:p-4 lg:p-5">
-                <GarmentViewer
-                  className="h-full w-full overflow-hidden rounded-xl"
-                  zoom={0.72}
-                  technique={displayTechnique}
-                  params={activeParams}
-                  seed={seed}
-                  carrier={activeStyle.model}
-                  style={activeStyle.shape}
-                  view={view}
-                  paint={paintBinding}
-                  textureDensity={textureDensity}
-                  patternImageUrl={appliedPatternUrl}
-                  onPatternImageError={handlePatternImageError}
-                  onCaptureReady={handleCaptureReady}
-                  fallback={
-                    <div className="relative h-full w-full">
-                      {isEmbroidery ? (
-                        <EmbroiderySwatch
-                          technique={displayTechnique}
-                          params={activeParams}
-                          seed={seed}
-                          pattern={patternId}
-                          className="h-full w-full"
-                        />
-                      ) : (
-                        <PatternSwatch
-                          seed={seed}
-                          motif={displayTechnique.motif}
-                          palette={displayTechnique.palette}
-                          className="h-full w-full"
-                        />
-                      )}
-                      <span className="absolute inset-x-0 bottom-0 bg-dye-950/50 px-2 py-1 text-center text-[10px] text-cloth-50">
-                        当前设备不支持 WebGL，已降级为平面预览
-                      </span>
-                    </div>
-                  }
-                />
+                <div className="relative h-full w-full">
+                  <GarmentViewer
+                    className="h-full w-full overflow-hidden rounded-xl"
+                    controlsOffsetTop={88}
+                    zoom={0.72}
+                    technique={displayTechnique}
+                    params={activeParams}
+                    seed={seed}
+                    carrier={activeStyle.model}
+                    style={activeStyle.shape}
+                    view={view}
+                    paint={paintBinding}
+                    textureDensity={textureDensity}
+                    onCaptureReady={handleCaptureReady}
+                    onSave={saveWorkSnapshot}
+                    saveDisabled={!hasModified || isSaved}
+                    saveLabel={isSaved ? "已保存" : "保存成品"}
+                    fallback={
+                      <div className="relative h-full w-full">
+                        {isEmbroidery ? (
+                          <EmbroiderySwatch
+                            technique={displayTechnique}
+                            params={activeParams}
+                            seed={seed}
+                            pattern={patternId}
+                            className="h-full w-full"
+                          />
+                        ) : (
+                          <PatternSwatch
+                            seed={seed}
+                            motif={displayTechnique.motif}
+                            palette={displayTechnique.palette}
+                            className="h-full w-full"
+                          />
+                        )}
+                        <span className="absolute inset-x-0 bottom-0 bg-dye-950/50 px-2 py-1 text-center text-[10px] text-cloth-50">
+                          当前设备不支持 WebGL，已降级为平面预览
+                        </span>
+                      </div>
+                    }
+                  />
+                </div>
               </div>
 
               <label className="absolute inset-x-4 bottom-12 mx-auto flex max-w-xs items-center gap-3 rounded-full border border-dye-900/10 bg-cloth-50/90 px-4 py-2 text-[11px] text-dye-800/70 shadow-sm backdrop-blur-sm">
@@ -1420,9 +1415,10 @@ export function PersonalWorkshop({
                   max={6}
                   step={0.5}
                   value={textureDensity}
-                  onChange={(event) =>
-                    setTextureDensity(Number(event.target.value))
-                  }
+                  onChange={(event) => {
+                    setTextureDensity(Number(event.target.value));
+                    markModified();
+                  }}
                   aria-label="纹理密度"
                   className="min-w-0 flex-1 accent-dye-700"
                 />
@@ -1468,72 +1464,74 @@ export function PersonalWorkshop({
               </span>
 
               {/* 涂鸦工具条：笔法跟着工艺走，也可以自己换 */}
-              <div className="absolute inset-x-0 bottom-24 flex justify-center">
-                <div className="flex max-w-[95%] flex-wrap items-center gap-1 rounded-full border border-dye-900/10 bg-cloth-50/90 px-1.5 py-1 backdrop-blur-sm">
-                  {(
-                    [
-                      { id: "soft", label: "晕染", tip: "扎染的晕圈：边缘化开" },
-                      { id: "flat", label: "块面", tip: "印染的块面：边界清楚" },
-                      { id: "stitch", label: "针脚", tip: "刺绣的走针：一笔一针" },
-                      { id: "erase", label: "洗掉", tip: "把这一块洗回坯布白" },
-                    ] as { id: PaintTool; label: string; tip: string }[]
-                  ).map((t) => (
+              {paintOn && (
+                <div className="absolute inset-x-0 bottom-24 flex justify-center">
+                  <div className="flex max-w-[95%] flex-wrap items-center gap-1 rounded-full border border-dye-900/10 bg-cloth-50/90 px-1.5 py-1 backdrop-blur-sm">
+                    {(
+                      [
+                        { id: "soft", label: "晕染", tip: "扎染的晕圈：边缘化开" },
+                        { id: "flat", label: "块面", tip: "印染的块面：边界清楚" },
+                        { id: "stitch", label: "针脚", tip: "刺绣的走针：一笔一针" },
+                        { id: "erase", label: "洗掉", tip: "把这一块洗回坯布白" },
+                      ] as { id: PaintTool; label: string; tip: string }[]
+                    ).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setBrushTool(t.id);
+                          setPaintOn(true);
+                        }}
+                        title={t.tip}
+                        aria-pressed={brushTool === t.id}
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10.5px] transition-colors",
+                          brushTool === t.id
+                            ? "bg-dye-700 text-cloth-50"
+                            : "text-dye-800/60 hover:bg-dye-700/10 hover:text-dye-900",
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                    <span className="mx-0.5 h-4 w-px bg-dye-900/12" />
+                    <label className="flex items-center gap-1 pl-1 pr-1.5">
+                      <span className="text-[9px] text-dye-800/40">笔径</span>
+                      <input
+                        type="range"
+                        min={3}
+                        max={40}
+                        step={1}
+                        value={Math.round(brushSize * 100)}
+                        onChange={(e) => setBrushSize(Number(e.target.value) / 100)}
+                        aria-label="笔刷大小"
+                        className="h-1 w-16 accent-dye-700"
+                      />
+                      <span className="w-5 font-mono text-[9px] text-dye-800/50">
+                        {Math.round(brushSize * 100)}
+                      </span>
+                    </label>
                     <button
-                      key={t.id}
                       type="button"
-                      onClick={() => {
-                        setBrushTool(t.id);
-                        setPaintOn(true);
-                      }}
-                      title={t.tip}
-                      aria-pressed={brushTool === t.id}
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10.5px] transition-colors",
-                        brushTool === t.id
-                          ? "bg-dye-700 text-cloth-50"
-                          : "text-dye-800/60 hover:bg-dye-700/10 hover:text-dye-900",
-                      )}
+                      onClick={undoPaint}
+                      disabled={paintStrokes === 0}
+                      title="撤销上一笔"
+                      className="rounded-full px-2 py-0.5 text-[10.5px] text-dye-800/60 transition-colors hover:bg-dye-700/10 hover:text-dye-900 disabled:opacity-35"
                     >
-                      {t.label}
+                      撤销
                     </button>
-                  ))}
-                  <span className="mx-0.5 h-4 w-px bg-dye-900/12" />
-                  <label className="flex items-center gap-1 pl-1 pr-1.5">
-                    <span className="text-[9px] text-dye-800/40">笔径</span>
-                    <input
-                      type="range"
-                      min={3}
-                      max={40}
-                      step={1}
-                      value={Math.round(brushSize * 100)}
-                      onChange={(e) => setBrushSize(Number(e.target.value) / 100)}
-                      aria-label="笔刷大小"
-                      className="h-1 w-16 accent-dye-700"
-                    />
-                    <span className="w-5 font-mono text-[9px] text-dye-800/50">
-                      {Math.round(brushSize * 100)}
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={undoPaint}
-                    disabled={paintStrokes === 0}
-                    title="撤销上一笔"
-                    className="rounded-full px-2 py-0.5 text-[10.5px] text-dye-800/60 transition-colors hover:bg-dye-700/10 hover:text-dye-900 disabled:opacity-35"
-                  >
-                    撤销
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearPaint}
-                    disabled={paintStrokes === 0}
-                    title="把坯布洗回纯白"
-                    className="rounded-full px-2 py-0.5 text-[10.5px] text-dye-800/60 transition-colors hover:bg-dye-700/10 hover:text-dye-900 disabled:opacity-35"
-                  >
-                    洗净
-                  </button>
+                    <button
+                      type="button"
+                      onClick={clearPaint}
+                      disabled={!cloth || cloth.isBlank}
+                      title="把坯布洗回纯白"
+                      className="rounded-full px-2 py-0.5 text-[10.5px] text-dye-800/60 transition-colors hover:bg-dye-700/10 hover:text-dye-900 disabled:opacity-35"
+                    >
+                      洗净
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* 实物参数：证明模型是按真实规格建的（压缩为单行，把高度让给 3D 画面） */}

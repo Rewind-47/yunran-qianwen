@@ -108,7 +108,7 @@ export const styleDb = {
   },
 
   /**
-   * 精选款：每个品类 2 款，工坊的「选款式」区只摆这些。
+   * 精选款：工坊的「选款式」区只展示这些款式。
    * 全库仍有 300 余款，检索、作品引用走 query / get。
    */
   featured(category?: StyleCategory): Style[] {

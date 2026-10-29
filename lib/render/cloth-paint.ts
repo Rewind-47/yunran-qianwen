@@ -58,6 +58,7 @@ interface Layer {
   texture: THREE.CanvasTexture;
   strokes: number;
   sketch: HTMLImageElement | null;
+  pattern: HTMLImageElement | null;
   /** 上一笔的位置（画布坐标），插值连线用 */
   last: { x: number; y: number } | null;
 }
@@ -74,7 +75,9 @@ export class ClothPaint {
   private layers = new Map<string, Layer>();
   private undoStack: { layerId: string; data: ImageData }[] = [];
   private pendingSketch: HTMLImageElement | null = null;
+  private pendingPattern: HTMLImageElement | null = null;
   private sketchRevision = 0;
+  private patternRevision = 0;
   private seq = 0;
 
   get strokes(): number {
@@ -84,7 +87,11 @@ export class ClothPaint {
   }
 
   get isBlank(): boolean {
-    return this.strokes === 0;
+    return (
+      this.strokes === 0 &&
+      !this.pendingPattern &&
+      ![...this.layers.values()].some((layer) => layer.pattern)
+    );
   }
 
   /** 给一片新衣料领一张布（幂等由调用方保证：每片只用一次） */
@@ -120,6 +127,7 @@ export class ClothPaint {
       texture,
       strokes: 0,
       sketch: null,
+      pattern: null,
       last: null,
     };
     // 之前铺过手绘稿的话，新衣片也要补上（局部重绘 → 工坊 直达时衣片后到）
@@ -127,15 +135,24 @@ export class ClothPaint {
       layer.sketch = this.pendingSketch;
       layer.strokes += 1;
     }
+    if (this.pendingPattern) {
+      layer.pattern = this.pendingPattern;
+    }
     this.layers.set(id, layer);
     this.renderLayer(layer);
     return id;
   }
 
   private renderLayer(layer: Layer) {
-    const { textureCtx, textureCanvas, canvas, sketch } = layer;
+    const { textureCtx, textureCanvas, canvas, sketch, pattern } = layer;
     textureCtx.clearRect(0, 0, SIZE, SIZE);
     textureCtx.drawImage(canvas, 0, 0);
+    if (pattern) {
+      textureCtx.save();
+      textureCtx.globalCompositeOperation = "multiply";
+      textureCtx.drawImage(pattern, 0, 0, SIZE, SIZE);
+      textureCtx.restore();
+    }
     if (sketch) {
       textureCtx.save();
       textureCtx.globalCompositeOperation = "multiply";
@@ -279,13 +296,16 @@ export class ClothPaint {
   /** 整件洗净 */
   clear() {
     this.sketchRevision += 1;
+    this.patternRevision += 1;
     this.pendingSketch = null;
+    this.pendingPattern = null;
     this.layers.forEach((l) => {
       this.undoStack.push({ layerId: l.id, data: l.ctx.getImageData(0, 0, SIZE, SIZE) });
       l.ctx.fillStyle = CLOTH;
       l.ctx.fillRect(0, 0, SIZE, SIZE);
       l.strokes = 0;
       l.sketch = null;
+      l.pattern = null;
       l.last = null;
       this.renderLayer(l);
     });
@@ -295,12 +315,14 @@ export class ClothPaint {
   /** 切换款式时清空所有衣片与撤销记录，避免旧款的笔迹污染新款。 */
   reset() {
     this.sketchRevision += 1;
+    this.patternRevision += 1;
     this.pendingSketch = null;
     this.layers.forEach((l) => {
       l.ctx.fillStyle = CLOTH;
       l.ctx.fillRect(0, 0, SIZE, SIZE);
       l.strokes = 0;
       l.sketch = null;
+      l.pattern = null;
       l.last = null;
       this.renderLayer(l);
     });
@@ -320,6 +342,19 @@ export class ClothPaint {
       l.strokes += 1;
       this.renderLayer(l);
     });
+  }
+
+  /** Apply an AI pattern as a persistent overlay so future brush strokes retain it. */
+  async applyPattern(src: string): Promise<boolean> {
+    const revision = ++this.patternRevision;
+    const image = await loadImage(src);
+    if (revision !== this.patternRevision) return false;
+    this.pendingPattern = image;
+    this.layers.forEach((l) => {
+      l.pattern = image;
+      this.renderLayer(l);
+    });
+    return true;
   }
 
   /** 移除从局部重绘应用的图案，同时保留用户在 3D 布料上的其他笔迹。 */

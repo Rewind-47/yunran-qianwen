@@ -1,7 +1,14 @@
 "use client";
 
 import { Canvas, useThree } from "@react-three/fiber";
-import { ContactShadows, Environment, Lightformer, OrbitControls } from "@react-three/drei";
+import {
+  Bounds,
+  Center,
+  ContactShadows,
+  Environment,
+  Lightformer,
+  OrbitControls,
+} from "@react-three/drei";
 import {
   Component,
   Suspense,
@@ -21,7 +28,7 @@ import {
 } from "@/components/garment/materials";
 import type { ClothPaint } from "@/lib/render/cloth-paint";
 import { models } from "@/components/garment/models";
-import { SCANNED_CARRIERS, ScannedFabric } from "@/components/garment/scanned";
+import { GlbFabric, SCANNED_CARRIERS, ScannedFabric } from "@/components/garment/scanned";
 import { cn } from "@/lib/utils";
 import type { StyleShape } from "@/lib/data/styles";
 import type { Technique } from "@/lib/types";
@@ -108,17 +115,20 @@ export interface GarmentViewerProps {
   autoRotate?: boolean;
   /** 是否显示右上角操作键（首页展位、工坊都开） */
   showControls?: boolean;
+  /** 右上角操作键距预览顶部的距离 */
+  controlsOffsetTop?: number;
   /** 取景缩放：<1 拉近模型，>1 拉远；只影响默认机位距离，不影响交互缩放范围 */
   zoom?: number;
   /** 布面涂鸦绑定；不给就是纯预览 */
   paint?: GarmentPaint | null;
-  /** 同源代理后的 AI 纹样图片；应用到所有衣料贴图 */
-  patternImageUrl?: string | null;
-  onPatternImageError?: (message: string) => void;
   /** 布面纹样重复密度 */
   textureDensity?: number;
   /** 3D renderer 准备好后提供画布截图函数 */
   onCaptureReady?: (capture: (() => string) | null) => void;
+  /** 画布右上角的保存操作 */
+  onSave?: () => void;
+  saveDisabled?: boolean;
+  saveLabel?: string;
   className?: string;
   fallback?: ReactNode;
 }
@@ -132,12 +142,14 @@ export function GarmentViewer({
   view = "quarter",
   autoRotate = false,
   showControls = true,
+  controlsOffsetTop = 10,
   zoom = 1,
   paint = null,
-  patternImageUrl = null,
-  onPatternImageError,
   textureDensity = 1,
   onCaptureReady,
+  onSave,
+  saveDisabled = false,
+  saveLabel = "保存成品",
   className,
   fallback,
 }: GarmentViewerProps) {
@@ -180,15 +192,51 @@ export function GarmentViewer({
   }, []);
 
   if (supported === false) {
-    return <div className={className}>{fallback}</div>;
+    return (
+      <div className={cn("relative overflow-hidden", className)}>
+        {fallback}
+        {onSave && (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saveDisabled}
+            className={cn(
+              "rounded-lg bg-[#1E3F5C] px-6 py-3 text-lg font-bold text-white shadow-lg transition-all",
+              saveDisabled
+                ? "cursor-not-allowed opacity-50"
+                : "hover:-translate-y-0.5 hover:shadow-xl",
+            )}
+            style={{ position: "absolute", top: "24px", right: "24px", zIndex: 50 }}
+          >
+            {saveLabel}
+          </button>
+        )}
+      </div>
+    );
   }
 
   if (supported === null) {
     return (
-      <div className={className}>
+      <div className={cn("relative overflow-hidden", className)}>
         <div className="grid h-full w-full place-items-center text-[11.5px] text-dye-800/40">
           正在准备 3D 视图…
         </div>
+        {onSave && (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saveDisabled}
+            className={cn(
+              "rounded-lg bg-[#1E3F5C] px-6 py-3 text-lg font-bold text-white shadow-lg transition-all",
+              saveDisabled
+                ? "cursor-not-allowed opacity-50"
+                : "hover:-translate-y-0.5 hover:shadow-xl",
+            )}
+            style={{ position: "absolute", top: "24px", right: "24px", zIndex: 50 }}
+          >
+            {saveLabel}
+          </button>
+        )}
       </div>
     );
   }
@@ -304,8 +352,6 @@ export function GarmentViewer({
               api={api}
               onInteract={grab}
               paint={paint}
-              patternImageUrl={patternImageUrl}
-              onPatternImageError={onPatternImageError}
               textureDensity={textureDensity}
             />
           </Suspense>
@@ -337,8 +383,28 @@ export function GarmentViewer({
         }}
       />
 
+      {onSave && (
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saveDisabled}
+          className={cn(
+            "rounded-lg bg-[#1E3F5C] px-6 py-3 text-lg font-bold text-white shadow-lg transition-all",
+            saveDisabled
+              ? "cursor-not-allowed opacity-50"
+              : "hover:-translate-y-0.5 hover:shadow-xl",
+          )}
+          style={{ position: "absolute", top: "24px", right: "24px", zIndex: 50 }}
+        >
+          {saveLabel}
+        </button>
+      )}
+
       {showControls && (
-        <div className="pointer-events-auto absolute right-2.5 top-2.5 z-20 flex flex-col gap-0.5 rounded-2xl border border-dye-900/10 bg-white/60 p-1 shadow-[0_12px_30px_-20px_rgba(16,31,47,0.7)] backdrop-blur-md">
+        <div
+          className="pointer-events-auto absolute right-2.5 z-20 flex flex-col gap-0.5 rounded-2xl border border-dye-900/10 bg-white/60 p-1 shadow-[0_12px_30px_-20px_rgba(16,31,47,0.7)] backdrop-blur-md"
+          style={{ top: controlsOffsetTop }}
+        >
           <ToolButton active={spin} onClick={() => setSpin((v) => !v)} label={spin ? "暂停自转" : "自动旋转"}>
             {spin ? "暂停" : "自转"}
           </ToolButton>
@@ -423,8 +489,6 @@ function ModelStage({
   api,
   onInteract,
   paint,
-  patternImageUrl,
-  onPatternImageError,
   textureDensity,
 }: {
   technique: Technique;
@@ -439,8 +503,6 @@ function ModelStage({
   api: { current: ViewerApi | null };
   onInteract: () => void;
   paint?: GarmentPaint | null;
-  patternImageUrl?: string | null;
-  onPatternImageError?: (message: string) => void;
   textureDensity: number;
 }) {
   const spec = carrierMap[carrier] ?? carrierMap.scarf;
@@ -475,67 +537,6 @@ function ModelStage({
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const ndc = useMemo(() => new THREE.Vector2(), []);
   const { camera, gl } = useThree();
-
-  useEffect(() => {
-    if (!patternImageUrl) return;
-
-    let cancelled = false;
-    let loadedTexture: THREE.Texture | null = null;
-    const loader = new THREE.TextureLoader();
-    loader.load(
-      patternImageUrl,
-      (texture) => {
-        loadedTexture = texture;
-        if (cancelled) {
-          texture.dispose();
-          return;
-        }
-
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.needsUpdate = true;
-        const root = group.current;
-        if (!root) {
-          onPatternImageError?.("3D 模型尚未准备完成，请稍后重试应用纹样。");
-          return;
-        }
-
-        let applied = 0;
-        root.traverse((object) => {
-          if (!(object instanceof THREE.Mesh)) return;
-          const materials = Array.isArray(object.material)
-            ? object.material
-            : [object.material];
-
-          for (const material of materials) {
-            if (!material.userData.paintLayer || !material.map) continue;
-            const canvas = material.map.image as HTMLCanvasElement | undefined;
-            const context = canvas?.getContext("2d");
-            if (!canvas || !context) continue;
-
-            context.save();
-            context.globalCompositeOperation = "multiply";
-            context.drawImage(texture.image, 0, 0, canvas.width, canvas.height);
-            context.restore();
-            material.map.needsUpdate = true;
-            applied += 1;
-          }
-        });
-
-        if (applied === 0) {
-          onPatternImageError?.("没有找到可应用纹样的布料材质，请稍后重试。");
-        }
-      },
-      undefined,
-      () => {
-        if (!cancelled) onPatternImageError?.("纹样图片加载失败，请重新生成后重试。");
-      },
-    );
-
-    return () => {
-      cancelled = true;
-      loadedTexture?.dispose();
-    };
-  }, [patternImageUrl, onPatternImageError]);
 
   /** 屏幕坐标 → 命中衣片的（图层 id, UV） */
   const pick = (clientX: number, clientY: number) => {
@@ -631,12 +632,20 @@ function ModelStage({
   return (
     <group ref={group} position={[0, 0, 0]}>
       {scannedStyle ? (
-        <ScannedFabric
-          src={scannedStyle.src}
-          scale={scannedStyle.scale ?? 1}
-          y={scannedStyle.ground ?? 0}
-          fabric={fabric}
-        />
+        scannedStyle.autoFit ? (
+          <Bounds fit clip observe margin={1.2}>
+            <Center>
+              <GlbFabric src={scannedStyle.src} fabric={fabric} />
+            </Center>
+          </Bounds>
+        ) : (
+          <ScannedFabric
+            src={scannedStyle.src}
+            scale={scannedStyle.scale ?? 1}
+            y={scannedStyle.ground ?? 0}
+            fabric={fabric}
+          />
+        )
       ) : (
         <Model fabric={fabric} style={style} />
       )}
@@ -763,8 +772,8 @@ function CameraRig({
       enablePan={enabled}
       screenSpacePanning
       enableRotate={enabled}
-      autoRotate={autoRotate && enabled}
-      autoRotateSpeed={0.9}
+      autoRotate={autoRotate}
+      autoRotateSpeed={2}
       enableDamping
       dampingFactor={0.075}
       rotateSpeed={0.85}

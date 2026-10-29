@@ -6,7 +6,7 @@ import type { CarrierId } from "@/lib/data/carriers";
  * 八个物品品类，覆盖服饰、帽饰、发饰、箱包、围巾披肩、家居布艺：
  *   连衣裙 / 上装 / 半身裙 / 帽饰 / 发饰 / 箱包 / 围巾披肩 / 家居布艺
  *
- * 每个品类都标了几款「精选」——这些款直接出现在创作工坊的选款区，
+ * 标记为「精选」的款式直接出现在创作工坊的选款区，
  * 判定标准是「扎染放得开」：整幅能出纹样、版型本身有足够留白。
  * 连衣裙例外：全部换成实物扫描件，并拆成「长裙 / 短裙」两组。
  * 其余款式仍留在库里，供检索与灵感广场的作品引用。
@@ -51,6 +51,8 @@ export type HemStyle =
 /** 外部扫描模型（GLB）的挂载信息：给了就替代程序化版型 */
 export interface ScannedGlb {
   src: string;
+  /** 通过 Bounds 按模型尺寸自动取景，并由 Center 将模型居中 */
+  autoFit?: boolean;
   /** 模型缩放。资产已归一化为高 1、底面 y=0 */
   scale?: number;
   /** 模型底面所在的 y；不给就沿用载体的地面高度 */
@@ -121,7 +123,7 @@ export interface Style {
   group?: string;
   /** 热度，用于默认排序 */
   hot: number;
-  /** 精选款：工坊选款区只展示这些（每品类 2 款，按「扎染放得开」挑） */
+  /** 精选款：工坊选款区直接展示这些，按「扎染放得开」挑选 */
   featured?: boolean;
 }
 
@@ -185,8 +187,8 @@ export const styleCategories: {
     id: "home",
     label: "家居布艺",
     en: "HOME TEXTILE",
-    desc: "靠枕坐垫与围裙，幅面完整，最适合放一整幅纹样",
-    models: ["cushion", "apron"],
+    desc: "抱枕、地毯、桌布与围裙等家居布艺，幅面完整，最适合放一整幅纹样",
+    models: ["cushion", "apron", "shawl"],
   },
 ];
 
@@ -221,7 +223,7 @@ export function deriveHem(name: string, flare = 0.5): HemStyle {
 /**
  * 每品类挑选「精选」：判定标准是扎染放得开——
  * 幅面够大、版型本身留白多，纹样不会被结构切碎。
- * 工坊的选款区只展示这两款，其余款式留在库里供检索与作品引用。
+ * 工坊的选款区只展示这些款式，其余款式留在库里供检索与作品引用。
  */
 const FEATURED_NAMES = new Set([
   // 连衣裙（长裙 4 款 + 短裙 1 款，均为实物扫描件，全部上架）
@@ -232,27 +234,24 @@ const FEATURED_NAMES = new Set([
   "高腰伞摆短裙",
   // 上装
   "落肩宽松T",
-  "亚麻衬衫",
+  "衬衫",
   // 半身裙
-  "伞裙",
-  "马面裙",
   "百褶马面长裙",
+  "短裙",
   // 帽饰
   "扎染渔夫帽",
-  "贝雷帽",
   "白族扎染渔夫帽",
   // 发饰
-  "扎染发带",
-  "复古宽发带",
+  "发圈",
   // 箱包
   "经典托特包",
-  "帆布购物袋",
   // 围巾披肩
   "扎染方巾",
-  "扎染长巾",
   // 家居布艺
   "扎染靠枕",
-  "扎染围裙",
+  "抱枕",
+  "地毯",
+  "桌布",
 ]);
 
 /** 品类内的序号计数器：发饰 / 家居的款式从帽饰、布艺里拆出来，编号要接着排 */
@@ -303,7 +302,6 @@ const skirtSeeds: Seed[] = [
   ["直筒包臀短裙", "PENCIL MINI", "通勤/街头", { len: 0.26, flare: 0.12, waist: 0.55, slit: 0.2 }, 84],
   ["高腰包臀中裙", "PENCIL MIDI", "通勤", { len: 0.62, flare: 0.14, waist: 0.85, slit: 0.35 }, 86],
   ["开衩包臀长裙", "SLIT MAXI", "通勤/礼服", { len: 0.92, flare: 0.16, waist: 0.7, slit: 0.75 }, 82],
-  ["伞裙", "CIRCLE SKIRT", "复古/文艺", { len: 0.62, flare: 0.95, waist: 0.75 }, 89],
   ["大摆长伞裙", "FULL MAXI", "复古/度假", { len: 0.9, flare: 0.98, waist: 0.8 }, 85],
   ["蛋糕裙", "TIERED SKIRT", "甜酷/度假", { len: 0.55, flare: 0.85, ruffle: 0.8 }, 87],
   ["层叠纱裙", "TULLE LAYER", "礼服/甜酷", { len: 0.7, flare: 0.9, ruffle: 1 }, 80],
@@ -315,7 +313,6 @@ const skirtSeeds: Seed[] = [
   ["松紧抽褶裙", "SHIRRED SKIRT", "度假/居家", { len: 0.55, flare: 0.6, waist: 0.6 }, 74],
   ["一片式裹身裙", "WRAP SKIRT", "度假", { len: 0.6, flare: 0.5, waist: 0.6, slit: 0.4 }, 82],
   ["侧系带裹裙", "TIE-SIDE WRAP", "度假", { len: 0.45, flare: 0.55, waist: 0.55, slit: 0.35 }, 77],
-  ["马面裙", "HORSE-FACE", "新中式", { len: 0.9, flare: 0.75, pleats: 18, waist: 0.8 }, 95],
   ["新中式百褶长裙", "NEW-CHINESE PLEAT", "新中式", { len: 0.88, flare: 0.7, pleats: 20, waist: 0.82 }, 88],
   ["不规则下摆裙", "ASYMMETRIC HEM", "街头", { len: 0.6, flare: 0.6, ruffle: 0.6, waist: 0.5 }, 73],
   ["前短后长裙", "HIGH-LOW SKIRT", "甜酷", { len: 0.65, flare: 0.65, waist: 0.55 }, 72],
@@ -346,6 +343,19 @@ const skirtSeeds: Seed[] = [
   ["垂坠缎面长裙", "DRAPE SATIN", "礼服", { len: 0.95, flare: 0.55, waist: 0.5 }, 80],
   ["扎染棉麻长裙", "TIE-DYE LINEN", "度假/文艺", { len: 0.9, flare: 0.8, waist: 0.6 }, 92],
   ["白族扎染围裙裙", "BAI APRON SKIRT", "新中式/手作", { len: 0.75, flare: 0.7, waist: 0.75 }, 85],
+  [
+    "短裙",
+    "MINI SKIRT",
+    "街头/甜酷",
+    {
+      model: "skirt",
+      len: 0.3,
+      flare: 0.55,
+      waist: 0.7,
+      glb: { src: "/models/duanqun1.glb", autoFit: true },
+    },
+    90,
+  ],
   [
     "百褶马面长裙",
     "PLEATED MAMIAN",
@@ -545,7 +555,6 @@ const topSeeds: Seed[] = [
   ["吊带背心", "CAMISOLE", "居家/甜酷", { model: "tee", len: 0.4, loose: 0.3, sleeve: 0, neck: 0.6 }, 83],
   ["无袖坎肩", "SLEEVELESS TOP", "通勤", { model: "tee", len: 0.45, loose: 0.4, sleeve: 0 }, 74],
   ["针织短袖", "KNIT SHORT", "通勤", { model: "tee", len: 0.5, loose: 0.2, sleeve: 0.5 }, 75],
-  ["亚麻衬衫", "LINEN SHIRT", "度假/文艺", { model: "shirt", len: 0.6, loose: 0.6, sleeve: 0.7, neck: 0.3 }, 88],
   ["牛津纺衬衫", "OXFORD SHIRT", "通勤", { model: "shirt", len: 0.6, loose: 0.5, sleeve: 1, neck: 0.25 }, 86],
   ["牛仔衬衫", "DENIM SHIRT", "街头", { model: "shirt", len: 0.6, loose: 0.5, sleeve: 1 }, 82],
   ["泡泡袖衬衫", "PUFF SHIRT", "甜酷/复古", { model: "shirt", len: 0.55, loose: 0.4, sleeve: 0.3 }, 80],
@@ -579,6 +588,19 @@ const topSeeds: Seed[] = [
   ["棒球服上衣", "VARSITY", "运动/学院", { model: "tee", len: 0.58, loose: 0.75, sleeve: 1 }, 77],
   ["扎染T恤", "TIE-DYE TEE", "街头/手作", { model: "tee", len: 0.55, loose: 0.6, sleeve: 0.5 }, 93],
   ["扎染衬衫", "TIE-DYE SHIRT", "度假/手作", { model: "shirt", len: 0.62, loose: 0.6, sleeve: 1 }, 90],
+  [
+    "衬衫",
+    "SHIRT",
+    "通勤/百搭",
+    {
+      model: "shirt",
+      len: 0.6,
+      loose: 0.5,
+      sleeve: 0.8,
+      glb: { src: "/models/chenshan.glb", autoFit: true },
+    },
+    91,
+  ],
 ];
 
 /* ------------------------------------------------------------------ */
@@ -606,7 +628,6 @@ const hatSeeds: Seed[] = [
   ["水手帽", "SAILOR", "复古", { model: "cap", brim: 0.35, crown: 0.45 }, 70],
   ["飞行帽", "AVIATOR", "机能/复古", { model: "cap", brim: 0.3, crown: 0.75 }, 68],
   ["扎染棒球帽", "TIE-DYE CAP", "手作/运动", { model: "cap", brim: 0.5, crown: 0.5 }, 92],
-  ["贝雷帽", "BERET", "复古/文艺", { model: "beret", brim: 0.6, crown: 0.5 }, 90],
   ["法式贝雷", "FRENCH BERET", "复古", { model: "beret", brim: 0.55, crown: 0.45 }, 88],
   ["画家帽", "ARTIST BERET", "文艺", { model: "beret", brim: 0.65, crown: 0.5 }, 82],
   ["羊毛贝雷", "WOOL BERET", "复古/通勤", { model: "beret", brim: 0.6, crown: 0.55 }, 84],
@@ -627,8 +648,17 @@ const hatSeeds: Seed[] = [
   ["蝴蝶结发箍", "BOW BAND", "甜酷", { model: "headband", crown: 0.35 }, 76],
   ["珍珠发箍", "PEARL BAND", "礼服", { model: "headband", crown: 0.25 }, 74],
   ["扭结发带", "KNOT BAND", "度假", { model: "headband", crown: 0.5 }, 79],
-  ["复古宽发带", "VINTAGE BAND", "复古", { model: "headband", crown: 0.8 }, 75],
-  ["扎染发带", "TIE-DYE BAND", "手作/运动", { model: "headband", crown: 0.55 }, 90],
+  [
+    "发圈",
+    "HAIR SCRUNCHIE",
+    "手作/甜酷",
+    {
+      model: "headband",
+      crown: 0.45,
+      glb: { src: "/models/faquan.glb", autoFit: true },
+    },
+    91,
+  ],
   ["礼帽", "FEDORA", "复古/礼服", { model: "bucketHat", brim: 0.85, crown: 0.85 }, 83],
   ["爵士帽", "JAZZ HAT", "复古", { model: "bucketHat", brim: 0.8, crown: 0.8 }, 80],
   ["巴拿马帽", "PANAMA", "度假/礼服", { model: "bucketHat", brim: 0.85, crown: 0.9 }, 85],
@@ -664,60 +694,11 @@ const hatSeeds: Seed[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* 五、箱包 50 款                                                       */
+/* 五、箱包                                                             */
 /* ------------------------------------------------------------------ */
 
 const bagSeeds: Seed[] = [
   ["经典托特包", "CLASSIC TOTE", "通勤", { model: "tote", len: 0.55, flare: 0.55, depth: 0.5 }, 95],
-  ["大容量托特", "XL TOTE", "通勤/度假", { model: "tote", len: 0.7, flare: 0.65, depth: 0.55 }, 90],
-  ["迷你托特", "MINI TOTE", "甜酷", { model: "tote", len: 0.35, flare: 0.4, depth: 0.45 }, 86],
-  ["帆布购物袋", "CANVAS SHOPPER", "街头/居家", { model: "tote", len: 0.6, flare: 0.6, depth: 0.4 }, 88],
-  ["皮质托特", "LEATHER TOTE", "通勤", { model: "tote", len: 0.55, flare: 0.55, depth: 0.5 }, 87],
-  ["软牛皮托特", "SOFT LEATHER", "通勤", { model: "tote", len: 0.55, flare: 0.6, depth: 0.6 }, 82],
-  ["编织托特", "WOVEN TOTE", "度假", { model: "tote", len: 0.5, flare: 0.55, depth: 0.5 }, 80],
-  ["草编包", "STRAW BAG", "度假", { model: "tote", len: 0.5, flare: 0.5, depth: 0.45 }, 83],
-  ["藤编手提包", "RATTAN BAG", "度假/复古", { model: "tote", len: 0.5, flare: 0.5, depth: 0.5 }, 76],
-  ["竹节包", "BAMBOO HANDLE", "复古", { model: "tote", len: 0.45, flare: 0.45, depth: 0.4 }, 78],
-  ["通勤手提包", "WORK TOTE", "通勤", { model: "tote", len: 0.6, flare: 0.6, depth: 0.55 }, 85],
-  ["医生包", "DOCTOR BAG", "复古/通勤", { model: "crossbody", len: 0.5, flare: 0.55, depth: 0.5 }, 74],
-  ["公文包", "BRIEFCASE", "通勤", { model: "crossbody", len: 0.45, flare: 0.6, depth: 0.35 }, 79],
-  ["电脑包", "LAPTOP BAG", "通勤/机能", { model: "crossbody", len: 0.4, flare: 0.6, depth: 0.3 }, 77],
-  ["单肩腋下包", "SHOULDER BAG", "通勤/街头", { model: "crossbody", len: 0.35, flare: 0.5, depth: 0.3 }, 91],
-  ["法棍包", "BAGUETTE", "复古/甜酷", { model: "crossbody", len: 0.3, flare: 0.65, depth: 0.25 }, 89],
-  ["月牙包", "CRESCENT", "街头", { model: "crossbody", len: 0.35, flare: 0.55, depth: 0.3 }, 86],
-  ["水桶包", "BUCKET BAG", "通勤/度假", { model: "crossbody", len: 0.55, flare: 0.45, depth: 0.45 }, 88],
-  ["抽绳水桶包", "DRAWSTRING BUCKET", "度假", { model: "crossbody", len: 0.6, flare: 0.45, depth: 0.45 }, 84],
-  ["斜挎小方包", "MINI SQUARE", "甜酷/街头", { model: "crossbody", len: 0.3, flare: 0.4, depth: 0.3 }, 87],
-  ["相机包", "CAMERA BAG", "街头/机能", { model: "crossbody", len: 0.35, flare: 0.5, depth: 0.4 }, 82],
-  ["邮差包", "MESSENGER", "街头/通勤", { model: "crossbody", len: 0.45, flare: 0.6, depth: 0.3 }, 90],
-  ["马鞍包", "SADDLE BAG", "复古", { model: "crossbody", len: 0.4, flare: 0.55, depth: 0.3 }, 85],
-  ["链条包", "CHAIN BAG", "礼服/通勤", { model: "crossbody", len: 0.3, flare: 0.45, depth: 0.25 }, 83],
-  ["手拿包", "CLUTCH", "礼服", { model: "crossbody", len: 0.25, flare: 0.5, depth: 0.2 }, 78],
-  ["云朵包", "CLOUD BAG", "甜酷", { model: "crossbody", len: 0.3, flare: 0.55, depth: 0.4 }, 81],
-  ["枕头包", "PILLOW BAG", "居家/甜酷", { model: "crossbody", len: 0.35, flare: 0.5, depth: 0.5 }, 76],
-  ["保龄球包", "BOWLING BAG", "复古", { model: "crossbody", len: 0.35, flare: 0.6, depth: 0.4 }, 74],
-  ["贝壳包", "SHELL BAG", "复古/通勤", { model: "crossbody", len: 0.35, flare: 0.5, depth: 0.35 }, 72],
-  ["饺子包", "DUMPLING", "街头", { model: "crossbody", len: 0.3, flare: 0.5, depth: 0.35 }, 75],
-  ["手机包", "PHONE BAG", "街头", { model: "crossbody", len: 0.2, flare: 0.3, depth: 0.2 }, 80],
-  ["腰包", "WAIST BAG", "机能/运动", { model: "crossbody", len: 0.25, flare: 0.5, depth: 0.25 }, 84],
-  ["胸包", "CHEST BAG", "机能", { model: "crossbody", len: 0.3, flare: 0.45, depth: 0.3 }, 79],
-  ["骑行包", "BIKE BAG", "机能/运动", { model: "crossbody", len: 0.25, flare: 0.5, depth: 0.3 }, 70],
-  ["束口袋", "DRAWSTRING POUCH", "居家/文艺", { model: "tote", len: 0.35, flare: 0.45, depth: 0.4 }, 73],
-  ["网兜袋", "NET BAG", "度假/街头", { model: "tote", len: 0.45, flare: 0.5, depth: 0.4 }, 68],
-  ["化妆包", "POUCH", "居家", { model: "tote", len: 0.25, flare: 0.45, depth: 0.35 }, 71],
-  ["双肩包", "BACKPACK", "通勤/运动", { model: "backpack", len: 0.6, flare: 0.5, depth: 0.55 }, 92],
-  ["轻量双肩包", "LIGHT BACKPACK", "运动", { model: "backpack", len: 0.55, flare: 0.45, depth: 0.45 }, 86],
-  ["复古帆布双肩", "VINTAGE CANVAS", "复古/文艺", { model: "backpack", len: 0.6, flare: 0.5, depth: 0.5 }, 84],
-  ["抽绳双肩包", "DRAWSTRING PACK", "机能", { model: "backpack", len: 0.58, flare: 0.45, depth: 0.5 }, 82],
-  ["书包", "SCHOOL PACK", "学院", { model: "backpack", len: 0.6, flare: 0.55, depth: 0.55 }, 88],
-  ["通勤双肩包", "COMMUTER PACK", "通勤", { model: "backpack", len: 0.62, flare: 0.5, depth: 0.5 }, 85],
-  ["旅行袋", "DUFFLE", "度假", { model: "tote", len: 0.5, flare: 0.75, depth: 0.55 }, 80],
-  ["行李袋", "WEEKENDER", "度假/通勤", { model: "tote", len: 0.55, flare: 0.8, depth: 0.6 }, 78],
-  ["圆筒包", "BARREL BAG", "街头", { model: "crossbody", len: 0.3, flare: 0.65, depth: 0.5 }, 74],
-  ["抽带束口包", "CINCH BAG", "文艺", { model: "tote", len: 0.4, flare: 0.5, depth: 0.45 }, 72],
-  ["藤编水桶", "RATTAN BUCKET", "度假", { model: "crossbody", len: 0.5, flare: 0.45, depth: 0.45 }, 70],
-  ["扎染托特包", "TIE-DYE TOTE", "手作/通勤", { model: "tote", len: 0.55, flare: 0.55, depth: 0.5 }, 94],
-  ["扎染斜挎包", "TIE-DYE CROSSBODY", "手作/街头", { model: "crossbody", len: 0.35, flare: 0.5, depth: 0.3 }, 92],
 ];
 
 /* ------------------------------------------------------------------ */
@@ -736,7 +717,6 @@ const textileSeeds: Seed[] = [
   ["包袱布", "FUROSHIKI", "手作/居家", { model: "scarf", len: 0.7, flare: 0.7 }, 72],
   ["风吕敷", "WRAP CLOTH", "手作", { model: "scarf", len: 0.75, flare: 0.75 }, 68],
   ["扎染方巾", "TIE-DYE SQUARE", "手作/度假", { model: "scarf", len: 0.55, flare: 0.55 }, 93],
-  ["扎染长巾", "TIE-DYE LONG", "手作/度假", { model: "shawl", len: 0.45, flare: 0.85, fringe: 1 }, 91],
   ["羊毛披肩", "WOOL SHAWL", "通勤/复古", { model: "shawl", len: 0.5, flare: 0.9, fringe: 1 }, 90],
   ["流苏披肩", "FRINGE SHAWL", "度假/复古", { model: "shawl", len: 0.55, flare: 0.95, fringe: 1 }, 88],
   ["薄纱披肩", "TULLE SHAWL", "礼服", { model: "shawl", len: 0.45, flare: 0.85 }, 80],
@@ -768,7 +748,6 @@ const textileSeeds: Seed[] = [
   ["椅垫", "CHAIR PAD", "居家", { model: "cushion", len: 0.4, flare: 0.4, depth: 0.25 }, 76],
   ["飘窗垫", "WINDOW PAD", "居家", { model: "cushion", len: 0.6, flare: 0.8, depth: 0.25 }, 72],
   ["蒲团", "FLOOR CUSHION", "居家/新中式", { model: "cushion", len: 0.65, flare: 0.65, depth: 0.6 }, 74],
-  ["扎染围裙", "TIE-DYE CUSHION", "手作/居家", { model: "cushion", len: 0.5, flare: 0.5, depth: 0.5 }, 94],
   ["扎染抱枕", "TIE-DYE PILLOW", "手作/居家", { model: "cushion", len: 0.65, flare: 0.65, depth: 0.55 }, 92],
   ["刺绣靠枕", "EMBROIDERED CUSHION", "新中式/居家", { model: "cushion", len: 0.5, flare: 0.5, depth: 0.5 }, 88],
   ["拼布坐垫", "PATCHWORK PAD", "手作/居家", { model: "cushion", len: 0.45, flare: 0.45, depth: 0.3 }, 78],
@@ -808,6 +787,43 @@ const homeSeeds: Seed[] = [
     90,
   ],
   ["短款工作围裙", "WORK APRON", "手作/餐饮", { model: "apron", len: 0.36, flare: 0.42, waist: 0.3 }, 78],
+  [
+    "抱枕",
+    "THROW PILLOW",
+    "居家/手作",
+    {
+      model: "cushion",
+      len: 0.5,
+      flare: 0.5,
+      depth: 0.5,
+      glb: { src: "/models/baozheng.glb", autoFit: true },
+    },
+    93,
+  ],
+  [
+    "地毯",
+    "RUG",
+    "居家",
+    {
+      model: "shawl",
+      len: 0.7,
+      flare: 0.9,
+      glb: { src: "/models/ditan.glb", autoFit: true },
+    },
+    89,
+  ],
+  [
+    "桌布",
+    "TABLECLOTH",
+    "居家",
+    {
+      model: "shawl",
+      len: 0.65,
+      flare: 0.9,
+      glb: { src: "/models/zhuobu.glb", autoFit: true },
+    },
+    87,
+  ],
 ];
 
 export const styles: Style[] = [
@@ -835,7 +851,7 @@ export const styleCategoryMap = Object.fromEntries(
   styleCategories.map((c) => [c.id, c]),
 ) as Record<StyleCategory, (typeof styleCategories)[number]>;
 
-/** 每品类的精选款：工坊「选款式」区只摆这两款 */
+/** 每品类的精选款：工坊「选款式」区直接展示这些款式 */
 export const featuredByCategory = Object.fromEntries(
   styleCategories.map((c) => [c.id, stylesByCategory[c.id].filter((s) => s.featured)]),
 ) as Record<StyleCategory, Style[]>;

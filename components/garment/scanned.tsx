@@ -1,7 +1,7 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 import type { ModelProps } from "@/components/garment/apparel";
 
@@ -32,6 +32,46 @@ export const SCANNED_CARRIERS = new Set(Object.keys(SCANNED_MODELS));
  * 并已归一化成「高 1、底面 y=0、XZ 居中」，所以这里只按款式数据缩放与落地。
  */
 export const PILLOW_GLB = "/models/pillow-scanned.glb";
+
+function renderFabricScene(object: THREE.Object3D, fabric: ReactNode): ReactNode {
+  const children = object.children.map((child) => renderFabricScene(child, fabric));
+
+  if (object instanceof THREE.Mesh) {
+    return (
+      <mesh
+        key={object.uuid}
+        geometry={object.geometry}
+        position={object.position}
+        quaternion={object.quaternion}
+        scale={object.scale}
+        visible={object.visible}
+        castShadow
+        receiveShadow
+      >
+        {fabric}
+        {children}
+      </mesh>
+    );
+  }
+
+  return (
+    <group
+      key={object.uuid}
+      position={object.position}
+      quaternion={object.quaternion}
+      scale={object.scale}
+      visible={object.visible}
+    >
+      {children}
+    </group>
+  );
+}
+
+/** 将 GLB 场景中的每个网格接入工坊面料材质。 */
+export function GlbFabric({ src, fabric }: ModelProps & { src: string }) {
+  const { scene } = useGLTF(src);
+  return renderFabricScene(scene, fabric);
+}
 
 function ScannedModel({ src, fabric }: ModelProps & { src: string }) {
   const { scene } = useGLTF(src);
